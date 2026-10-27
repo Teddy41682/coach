@@ -1,0 +1,29 @@
+name: CoachDemo
+options:
+  bundleIdPrefix: co.jhabite
+  deploymentTarget: { iOS: "17.2" }
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+packages:
+  CoachKit: { path: ../CoachKit }
+  CoachGlasses: { path: ../CoachGlasses }
+targets:
+  CoachDemo:
+    type: application
+    platform: iOS
+    sources: [CoachDemo]
+    dependencies:
+      - package: CoachKit
+      - package: CoachGlasses
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.jhabite.coachdemo
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: CoachDemo/Info.plist
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"

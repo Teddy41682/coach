@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig (git-ignored) and fill in.
+DEVELOPMENT_TEAM =
+// The Worker's app key (X-Coach-Key) — never commit it.
+COACH_APP_KEY =
