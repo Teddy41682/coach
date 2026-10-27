@@ -3,7 +3,7 @@ import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
-import { checkAndCount, D1UsageStore, hstDay, LIMIT_LINE, type UsageStore } from "./limits";
+import { checkAndCount, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { D1SessionStore, type SessionStore } from "./session";
 import { encodeEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
@@ -99,7 +99,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (!device || device.length > 100) return bad(400, "no_device");
     const recipe = (got.body as { recipe?: unknown } | null)?.recipe;
     if (!isRecipe(recipe)) return bad(400, "bad_recipe");
-    if ((await checkAndCount(deps.usage, device, hstDay(deps.now()))) !== "ok") return bad(429, "daily_limit");
+    if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), LINK_CENTS)) !== "ok") return bad(429, "daily_limit");
     const links = await linkSteps(recipe, deps.model("link"));
     const id = crypto.randomUUID();
     await deps.store.put({ id, device, recipe, links, createdAt: deps.now() });
@@ -115,7 +115,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (!device || device.length > 100) return bad(400, "no_device");
     const session = await deps.store.get(turn.sessionId);
     if (!session) return bad(404, "unknown_session");
-    if ((await checkAndCount(deps.usage, device, hstDay(deps.now()))) !== "ok") {
+    if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), costOf(turn.frames.length))) !== "ok") {
       // Spoken like any answer, so the cook hears why; the model is never asked.
       const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
       return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
