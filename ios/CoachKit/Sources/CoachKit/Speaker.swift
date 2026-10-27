@@ -9,6 +9,8 @@ public final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
   public private(set) var isSpeaking = false
   /// When the last line finished; the listener stays deaf for a moment after it.
   public private(set) var lastFinished: Date = .distantPast
+  /// Called when the coach falls quiet, so the listener can start a clean transcript.
+  public var onQuiet: (() -> Void)?
 
   public override init() {
     // The best installed English voice: premium or enhanced if the phone has one.
@@ -30,11 +32,11 @@ public final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
 
   nonisolated public func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) {
     Task { @MainActor in
-      if !self.synth.isSpeaking { self.isSpeaking = false; self.lastFinished = Date() }
+      if !self.synth.isSpeaking { self.isSpeaking = false; self.lastFinished = Date(); self.onQuiet?() }
     }
   }
 
   nonisolated public func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) {
-    Task { @MainActor in self.isSpeaking = false; self.lastFinished = Date() }
+    Task { @MainActor in self.isSpeaking = false; self.lastFinished = Date(); self.onQuiet?() }
   }
 }
