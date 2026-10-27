@@ -1,11 +1,20 @@
+import { cooking } from "./expertise/cooking";
+import type { CoachRecipe } from "./expertise/pack";
+import { linkSteps } from "./link";
+import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
+import { D1SessionStore, type SessionStore } from "./session";
 import { runTurn, type TurnRequest } from "./turn";
 
 export interface Env {
   MODEL_API_KEY: string;
   /** The app's key: every request must carry it in `X-Coach-Key`, so the Meta credit is not an open proxy. */
   COACH_APP_KEY: string;
+  DB?: D1Database;
 }
+
+/** What the routes need from the world, so tests can swap the store and the model. */
+export type Deps = { store: SessionStore; model: () => ModelConnector; now: () => number };
 
 /** What one turn may carry. A glasses frame at 720 px and JPEG 0.5 is ~60 KB of base64; these leave headroom. */
 export const MAX_FRAMES = 8;
@@ -15,14 +24,24 @@ export const MAX_SEEN = 50;
 export const MAX_BODY_BYTES = 4_000_000;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
+const str = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
+
 function isTurn(b: unknown): b is TurnRequest {
   const t = b as TurnRequest;
-  return !!t && typeof t.sessionId === "string" && t.sessionId.length <= 100
+  return !!t && str(t.sessionId, 100)
     && Number.isInteger(t.stepIndex) && t.stepIndex >= 0
-    && typeof t.utterance === "string" && t.utterance.length <= MAX_UTTERANCE
+    && str(t.utterance, MAX_UTTERANCE)
     && Array.isArray(t.frames) && t.frames.length <= MAX_FRAMES
-    && t.frames.every((f) => typeof f === "string" && f.length <= MAX_FRAME_CHARS && BASE64.test(f))
-    && Array.isArray(t.seen) && t.seen.length <= MAX_SEEN && t.seen.every((s) => typeof s === "string" && s.length <= 100);
+    && t.frames.every((f) => str(f, MAX_FRAME_CHARS) && BASE64.test(f))
+    && Array.isArray(t.seen) && t.seen.length <= MAX_SEEN && t.seen.every((s) => str(s, 100));
+}
+
+function isRecipe(r: unknown): r is CoachRecipe {
+  const x = r as CoachRecipe;
+  return !!x && str(x.title, 200)
+    && Array.isArray(x.ingredients) && x.ingredients.length <= 100
+    && x.ingredients.every((i) => !!i && str(i.amount, 100) && str(i.item, 200))
+    && Array.isArray(x.steps) && x.steps.length <= 60 && x.steps.every((s) => str(s, 1000));
 }
 
 /** The body as text, or null once it passes `max` bytes — counted as it streams, whatever Content-Length claims. */
@@ -52,25 +71,60 @@ function sameKey(given: string | null, expected: string): boolean {
   return diff === 0;
 }
 
+const bad = (status: number, error: string) => Response.json({ error }, { status });
+
+/** Auth, size cap and JSON parse, shared by every POST route. Returns the parsed body or the refusal. */
+async function admit(request: Request, env: Env): Promise<{ body: unknown } | Response> {
+  if (!sameKey(request.headers.get("X-Coach-Key"), env.COACH_APP_KEY)) return bad(401, "unauthorised");
+  if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) return bad(413, "too_large");
+  const text = await readBounded(request, MAX_BODY_BYTES);
+  if (text === null) return bad(413, "too_large");
+  try { return { body: JSON.parse(text) }; } catch { return { body: null }; }
+}
+
+async function handle(request: Request, env: Env, deps: Deps): Promise<Response> {
+  const url = new URL(request.url);
+  if (request.method !== "POST") return bad(404, "not_found");
+
+  if (url.pathname === "/v1/session") {
+    const got = await admit(request, env);
+    if (got instanceof Response) return got;
+    const device = request.headers.get("X-Coach-Device");
+    if (!device || device.length > 100) return bad(400, "no_device");
+    const recipe = (got.body as { recipe?: unknown } | null)?.recipe;
+    if (!isRecipe(recipe)) return bad(400, "bad_recipe");
+    const links = await linkSteps(recipe, deps.model());
+    const id = crypto.randomUUID();
+    await deps.store.put({ id, device, recipe, links, createdAt: deps.now() });
+    return Response.json({ sessionId: id, steps: recipe.steps.map((text, index) => ({ index, text, ingredients: links[index] ?? [] })) });
+  }
+
+  if (url.pathname === "/v1/turn") {
+    const got = await admit(request, env);
+    if (got instanceof Response) return got;
+    if (!isTurn(got.body)) return bad(400, "bad_request");
+    const turn = got.body;
+    const session = await deps.store.get(turn.sessionId);
+    if (!session) return bad(404, "unknown_session");
+    const ctx = {
+      recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
+      stepIngredients: session.links[Math.min(turn.stepIndex, Math.max(session.links.length - 1, 0))] ?? [],
+    };
+    return new Response(runTurn(turn, deps.model(), { system: cooking.system(ctx), user: cooking.user(ctx) }), {
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+    });
+  }
+
+  return bad(404, "not_found");
+}
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    if (request.method === "POST" && url.pathname === "/v1/turn") {
-      if (!sameKey(request.headers.get("X-Coach-Key"), env.COACH_APP_KEY)) {
-        return Response.json({ error: "unauthorised" }, { status: 401 });
-      }
-      if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) {
-        return Response.json({ error: "too_large" }, { status: 413 });
-      }
-      const text = await readBounded(request, MAX_BODY_BYTES);
-      if (text === null) return Response.json({ error: "too_large" }, { status: 413 });
-      let body: unknown = null;
-      try { body = JSON.parse(text); } catch { /* falls through to bad_request */ }
-      if (!isTurn(body)) return Response.json({ error: "bad_request" }, { status: 400 });
-      return new Response(runTurn(body, new MuseConnector(env.MODEL_API_KEY)), {
-        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
-      });
-    }
-    return Response.json({ error: "not_found" }, { status: 404 });
+  fetch(request: Request, env: Env): Promise<Response> {
+    return handle(request, env, {
+      store: new D1SessionStore(env.DB as D1Database),
+      model: () => new MuseConnector(env.MODEL_API_KEY),
+      now: () => Date.now(),
+    });
   },
+  handle,
 };

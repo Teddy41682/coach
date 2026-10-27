@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+import worker from "../src/index";
+import { MemorySessionStore } from "../src/session";
+import type { ModelConnector } from "../src/model/connector";
+
+const env = { MODEL_API_KEY: "k", COACH_APP_KEY: "app" };
+const H = { "Content-Type": "application/json", "X-Coach-Key": "app", "X-Coach-Device": "dev-1" };
+const recipe = { title: "Pancakes", ingredients: [{ amount: "200 g", item: "flour" }, { amount: "2", item: "eggs" }], steps: ["Whisk the flour.", "Beat in the eggs."] };
+
+function deps(model: ModelConnector) {
+  return { store: new MemorySessionStore(), model: () => model, now: () => 1_000 };
+}
+const linker: ModelConnector = { async *stream() { yield '{"steps":[["flour"],["eggs"]]}'; } };
+
+describe("POST /v1/session", () => {
+  it("creates a session and returns the linked steps", async () => {
+    const d = deps(linker);
+    const r = await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: H, body: JSON.stringify({ recipe }) }), env, d);
+    expect(r.status).toBe(200);
+    const body = await r.json() as { sessionId: string; steps: unknown };
+    expect(body.steps).toEqual([{ index: 0, text: "Whisk the flour.", ingredients: ["flour"] }, { index: 1, text: "Beat in the eggs.", ingredients: ["eggs"] }]);
+    expect(await d.store.get(body.sessionId)).toMatchObject({ device: "dev-1", links: [["flour"], ["eggs"]] });
+  });
+  it("needs a device header", async () => {
+    const { "X-Coach-Device": _, ...noDevice } = H;
+    const r = await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: noDevice, body: JSON.stringify({ recipe }) }), env, deps(linker));
+    expect(r.status).toBe(400);
+  });
+  it("refuses a malformed recipe", async () => {
+    const r = await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: H, body: JSON.stringify({ recipe: { title: 3 } }) }), env, deps(linker));
+    expect(r.status).toBe(400);
+  });
+});
+
+describe("POST /v1/turn with sessions", () => {
+  it("is 404 for an unknown session", async () => {
+    const turn = { sessionId: "nope", stepIndex: 0, utterance: "hi", frames: [], seen: [] };
+    const r = await worker.handle(new Request("https://c/v1/turn", { method: "POST", headers: H, body: JSON.stringify(turn) }), env, deps(linker));
+    expect(r.status).toBe(404);
+  });
+  it("frames the question with the session's recipe and the step's ingredients", async () => {
+    let system = "";
+    const model: ModelConnector = { async *stream(req) { if (req.system.includes("Recipe:")) system = req.system; yield '{"steps":[["flour"],["eggs"]]}'; } };
+    const d = deps(model);
+    const made = await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: H, body: JSON.stringify({ recipe }) }), env, d);
+    const { sessionId } = await made.json() as { sessionId: string };
+    const turn = { sessionId, stepIndex: 1, utterance: "ok?", frames: [], seen: [] };
+    const r = await worker.handle(new Request("https://c/v1/turn", { method: "POST", headers: H, body: JSON.stringify(turn) }), env, d);
+    await r.text();
+    expect(system).toContain("Step 2 of 2: Beat in the eggs.");
+    expect(system).toContain("This step uses: eggs");
+  });
+});

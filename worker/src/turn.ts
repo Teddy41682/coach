@@ -21,7 +21,16 @@ export const APOLOGY = "Sorry, I lost that — ask me again.";
  * there is never dead air while it looks; the model's text follows as it streams. Any failure — a thrown error or
  * a model past TURN_TIMEOUT_MS — ends with a spoken apology, never a silent close.
  */
-export function runTurn(req: TurnRequest, model: ModelConnector, timeoutMs = TURN_TIMEOUT_MS): ReadableStream<Uint8Array> {
+export type Prompt = { system: string; user: string };
+
+const BARE: (req: TurnRequest) => Prompt = (req) => ({
+  system: "You are a cooking coach speaking through smart glasses. Answer in one or two short sentences.",
+  user: req.utterance,
+});
+
+export function runTurn(
+  req: TurnRequest, model: ModelConnector, prompt: Prompt = BARE(req), timeoutMs = TURN_TIMEOUT_MS,
+): ReadableStream<Uint8Array> {
   return new ReadableStream({
     async start(controller) {
       const send = (e: CoachEvent) => controller.enqueue(encodeEvent(e));
@@ -33,8 +42,7 @@ export function runTurn(req: TurnRequest, model: ModelConnector, timeoutMs = TUR
         abort.signal.addEventListener("abort", () => reject(new Error("timeout")), { once: true }));
       try {
         const it = model.stream(
-          { system: "You are a cooking coach speaking through smart glasses. Answer in one or two short sentences.",
-            user: req.utterance, images: req.frames },
+          { ...prompt, images: req.frames },
           abort.signal,
         )[Symbol.asyncIterator]();
         for (;;) {
