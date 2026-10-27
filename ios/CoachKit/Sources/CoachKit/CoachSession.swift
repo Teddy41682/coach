@@ -21,6 +21,12 @@ public final class CoachSession {
   private let now: () -> Date
   /// When the current step began, so "done" can look back across all of it.
   public private(set) var stepStartedAt: Date
+  /// The conversation so far — the cook's words and the coach's — sent with each turn so the coach builds on it.
+  public private(set) var history: [HistoryLine] = []
+  static let historyLimit = 12
+  /// How long an answer may take before "let me take a look" is spoken to cover the wait.
+  static let ackDelay = 0.75
+  private var pendingAck: UUID?
   private let schedule: (Double, @escaping @MainActor () -> Void) -> Void
 
   /// - Parameters:
@@ -39,6 +45,17 @@ public final class CoachSession {
     self.now = now; self.stepStartedAt = now()
   }
 
+  private func remember(_ who: HistoryLine.Who, _ text: String) {
+    guard !text.isEmpty else { return }
+    history.append(HistoryLine(who: who, text: text))
+    if history.count > Self.historyLimit { history.removeFirst(history.count - Self.historyLimit) }
+  }
+
+  private func advance() {
+    if stepIndex + 1 >= steps.count { phase = .finished; say("That was the last step. Enjoy it."); return }
+    stepIndex += 1; stepStartedAt = now(); speakStep()
+  }
+
   private func speakStep() {
     guard steps.indices.contains(stepIndex) else { return }
     say("Step \(stepIndex + 1): \(steps[stepIndex].text)")
@@ -47,8 +64,7 @@ public final class CoachSession {
   public func handle(_ intent: Intent) async {
     switch intent {
     case .next:
-      if stepIndex + 1 >= steps.count { phase = .finished; say("That was the last step. Enjoy it."); return }
-      stepIndex += 1; stepStartedAt = now(); speakStep()
+      advance()
     case .previous:
       stepIndex = max(0, stepIndex - 1); stepStartedAt = now(); speakStep()
     case .repeatStep:
@@ -74,31 +90,50 @@ public final class CoachSession {
   }
 
   private func ask(_ utterance: String, _ need: FrameNeed) async {
-    let turn = TurnRequest(sessionId: sessionId, stepIndex: stepIndex, utterance: utterance, frames: frames(need), seen: [])
+    var turn = TurnRequest(sessionId: sessionId, stepIndex: stepIndex, utterance: utterance, frames: frames(need), seen: [])
+    turn.history = history
+    remember(.cook, utterance)
+    var spoken: [String] = []
+    var decision = Decision.stay
     // Text arrives in fragments; it is spoken a whole sentence at a time, and whatever is left when the turn ends.
     var pending = ""
+    func speak(_ line: String) { spoken.append(line); say(line) }
     func flush() {
       let rest = pending.trimmingCharacters(in: .whitespaces)
-      if !rest.isEmpty { say(rest) }
+      if !rest.isEmpty { speak(rest) }
       pending = ""
     }
+    /// The ack is held back and only spoken if nothing else has started within `ackDelay`.
+    func cancelAck() { pendingAck = nil }
     do {
       for try await event in send(turn) {
         switch event {
-        case .ack(let line): say(line)
+        case .ack(let line):
+          let token = UUID()
+          pendingAck = token
+          schedule(Self.ackDelay) { [weak self] in
+            guard let self, self.pendingAck == token else { return }
+            self.pendingAck = nil
+            self.say(line)
+          }
         case .text(let piece):
+          cancelAck()
           pending += piece
-          completeSentences(&pending).forEach(say)
-        case .error(let line): flush(); say(line)
+          completeSentences(&pending).forEach(speak)
+        case .action(let d): decision = d
+        case .error(let line): cancelAck(); flush(); say(line)
         case .done: flush()
         }
       }
       flush()
     } catch {
+      cancelAck()
       flush()
       // The connection itself failed (no signal, server down): still never silence.
       say(Self.lostLine)
     }
+    remember(.coach, spoken.joined(separator: " "))
+    if decision == .next { advance() }
   }
 
   static let lostLine = "Sorry, I lost that — ask me again."

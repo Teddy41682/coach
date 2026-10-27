@@ -1,6 +1,6 @@
 import Foundation
 
-private struct Wire: Decodable { let type: String; let text: String? }
+private struct Wire: Decodable { let type: String; let text: String?; let action: String? }
 
 /// One server-sent-events line as a coach event; nil for anything that isn't an event we know.
 public func decodeEvent(line: String) throws -> CoachEvent? {
@@ -9,6 +9,7 @@ public func decodeEvent(line: String) throws -> CoachEvent? {
   switch w.type {
   case "ack": return .ack(w.text ?? "")
   case "text": return .text(w.text ?? "")
+  case "action": return .action(Decision(rawValue: w.action ?? "") ?? .stay)
   case "done": return .done
   case "error": return .error(w.text ?? "")
   default: return nil

@@ -23,6 +23,14 @@ public struct LinkedStep: Codable, Sendable, Equatable {
   public init(index: Int, text: String, ingredients: [String]) { self.index = index; self.text = text; self.ingredients = ingredients }
 }
 
+/// One line of the conversation so far.
+public struct HistoryLine: Codable, Sendable, Equatable {
+  public enum Who: String, Codable, Sendable { case cook, coach }
+  public let who: Who
+  public let text: String
+  public init(who: Who, text: String) { self.who = who; self.text = text }
+}
+
 /// What `/v1/turn` takes.
 public struct TurnRequest: Codable, Sendable, Equatable {
   public let sessionId: String
@@ -31,12 +39,18 @@ public struct TurnRequest: Codable, Sendable, Equatable {
   /// Base64 JPEG frames.
   public let frames: [String]
   public let seen: [String]
+  /// The conversation so far, oldest first; the Worker takes at most 12 lines.
+  public var history: [HistoryLine]? = nil
 }
+
+/// The coach's call on the current step, sent after its answer.
+public enum Decision: String, Sendable { case next, stay }
 
 /// What `/v1/turn` streams back, in order: maybe an ack, text pieces, then done or an error.
 public enum CoachEvent: Sendable, Equatable {
   case ack(String)
   case text(String)
+  case action(Decision)
   case done
   case error(String)
 }

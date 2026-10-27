@@ -6,8 +6,11 @@ import Testing
 @MainActor final class Rig {
   var said: [String] = []
   var turns: [TurnRequest] = []
-  var reply: [CoachEvent] = [.ack("Let me see."), .text("Looks good."), .done]
+  var reply: [CoachEvent] = [.ack("Let me see."), .text("Looks good."), .action(.stay), .done]
   var failConnection = false
+  /// When set, the turn's stream is fed by hand through this continuation (for timing tests).
+  var manual: AsyncThrowingStream<CoachEvent, Error>.Continuation?
+  var useManual = false
   var pending: [(Double, @MainActor () -> Void)] = []
   var now: Double = 0
   var needs: [CoachSession.FrameNeed] = []
@@ -20,6 +23,11 @@ import Testing
       send: { [unowned self] t in
         self.turns.append(t)
         let events = self.reply, fail = self.failConnection
+        if self.useManual {
+          let (stream, c) = AsyncThrowingStream.makeStream(of: CoachEvent.self)
+          self.manual = c
+          return stream
+        }
         return AsyncThrowingStream { c in
           if fail { c.finish(throwing: URLError(.notConnectedToInternet)); return }
           events.forEach { c.yield($0) }; c.finish()
@@ -68,7 +76,8 @@ import Testing
     #expect(rig.turns.count == 1)
     #expect(rig.turns[0].stepIndex == 1)
     #expect(rig.turns[0].frames == ["F"])
-    #expect(rig.said.suffix(2) == ["Let me see.", "Looks good."])
+    // The answer arrived at once, so the ack was never needed (spec: ack only on a real wait).
+    #expect(rig.said.suffix(2) == ["Step 2: Add the eggs.", "Looks good."])
   }
 
   @Test func doneReviewsTheWholeStepAQuestionLooksNow() async {
@@ -99,7 +108,7 @@ import Testing
     rig.reply = [.ack("Let me see."), .text("Not quite yet —"), .text(" the egg white is missing. Add"), .text(" it, then beat."), .done]
     let s = rig.session()
     await s.handle(.question("ok?"))
-    #expect(rig.said == ["Let me see.", "Not quite yet — the egg white is missing.", "Add it, then beat."])
+    #expect(rig.said == ["Not quite yet — the egg white is missing.", "Add it, then beat."])
   }
 
   @Test func aLostConnectionIsSpokenNotSilent() async {
@@ -119,5 +128,53 @@ import Testing
     rig.advance(1)
     #expect(rig.said.last == "Your 20-minute timer is up — let's check.")
     #expect(s.phase == .cooking)
+  }
+
+  @Test func theCoachsNextAdvancesAndReadsTheStep() async {
+    let rig = Rig(); rig.reply = [.text("That's drained, nice."), .action(.next), .done]
+    let s = rig.session()
+    await s.handle(.question("is it drained?"))
+    #expect(s.stepIndex == 1)
+    #expect(rig.said.suffix(2) == ["That's drained, nice.", "Step 2: Add the eggs."])
+  }
+
+  @Test func stayStaysPut() async {
+    let rig = Rig(); rig.reply = [.text("Tilt it toward me."), .action(.stay), .done]
+    let s = rig.session()
+    await s.handle(.question("is it drained?"))
+    #expect(s.stepIndex == 0)
+  }
+
+  @Test func theConversationTravelsWithEachTurnCappedAtTwelve() async {
+    let rig = Rig(); rig.reply = [.text("Fine."), .action(.stay), .done]
+    let s = rig.session()
+    for n in 0..<10 { await s.handle(.question("q\(n)")) }
+    let last = rig.turns.last!
+    #expect(last.history?.count == 12)
+    #expect(last.history?.last == HistoryLine(who: .coach, text: "Fine."))
+    #expect(last.history?.contains(HistoryLine(who: .cook, text: "q8")) == true)
+    #expect(last.utterance == "q9")
+  }
+
+  @Test func aQuickAnswerHasNoAck() async {
+    let rig = Rig(); rig.reply = [.ack("Let me see."), .text("Fine."), .action(.stay), .done]
+    let s = rig.session()
+    await s.handle(.question("ok?"))
+    rig.advance(5)
+    #expect(rig.said == ["Fine."])
+  }
+
+  @Test func aSlowAnswerIsCoveredByTheAck() async {
+    let rig = Rig(); rig.useManual = true
+    let s = rig.session()
+    let turn = Task { await s.handle(.question("ok?")) }
+    while rig.manual == nil { await Task.yield() }
+    rig.manual?.yield(.ack("Let me see."))
+    for _ in 0..<5 { await Task.yield() }
+    rig.advance(0.8)
+    rig.manual?.yield(.text("Fine."))
+    rig.manual?.yield(.action(.stay)); rig.manual?.yield(.done); rig.manual?.finish()
+    await turn.value
+    #expect(rig.said == ["Let me see.", "Fine."])
   }
 }

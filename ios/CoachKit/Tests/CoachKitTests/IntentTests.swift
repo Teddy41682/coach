@@ -5,6 +5,10 @@ import Testing
   @Test(arguments: ["What's next?", "next step", "Next", "what now"])
   func next(_ s: String) { #expect(parseIntent(s) == .next) }
 
+  @Test(arguments: ["shall we move onto the next step", "OK let's go to the next step", "can we move onto step two",
+                     "move on", "let's move on", "go to the next step", "next step please", "ready for the next step"])
+  func naturalMoveOn(_ s: String) { #expect(parseIntent(s) == .next) }
+
   @Test(arguments: ["go back", "previous step", "Go back a step"])
   func previous(_ s: String) { #expect(parseIntent(s) == .previous) }
 

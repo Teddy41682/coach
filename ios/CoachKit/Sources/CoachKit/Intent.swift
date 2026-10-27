@@ -58,6 +58,12 @@ public func parseIntent(_ utterance: String) -> Intent {
   if ["i'm back", "im back", "i am back", "back now", "i'm back now"].contains(phrase) { return .back }
   if ["go back", "previous step", "go back a step", "last step", "back a step"].contains(phrase) { return .previous }
   if ["what's next", "whats next", "next step", "next", "what now", "what next"].contains(phrase) { return .next }
+  // Natural ways of asking to move on ("shall we move onto the next step", "can we move onto step two"). Short
+  // utterances only, so "is the next step hard?"-style questions still reach the coach.
+  let asksToMoveOn = phrase.contains("move on") || phrase.contains("next step")
+    || words.contains("step") && ["two", "2", "three", "3", "four", "4", "five", "5"].contains(where: words.contains)
+  if asksToMoveOn && words.count <= 10 && !utterance.contains("?") || asksToMoveOn && phrase.hasPrefix("shall we")
+    || asksToMoveOn && phrase.hasPrefix("can we") { return .next }
   if ["say that again", "repeat that", "repeat", "what was that", "again"].contains(phrase) { return .repeatStep }
   if ["done", "i'm done", "im done", "i am done", "that's done", "thats done", "finished", "all done"].contains(phrase)
     || (words.first == "finished" && words.count <= 3) {
