@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { MuseConnector } from "../src/model/muse";
 
 function sseBody(lines: string[]): ReadableStream<Uint8Array> {
@@ -43,4 +43,16 @@ describe("MuseConnector", () => {
     const it = m.stream({ system: "", user: "", images: [] }, new AbortController().signal)[Symbol.asyncIterator]();
     await expect(it.next()).rejects.toThrow(/401/);
   });
+
+  it("calls the platform fetch unbound by default (Workers throws 'Illegal invocation' otherwise)", async () => {
+    vi.stubGlobal("fetch", function (this: unknown) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(new Response(sseBody(['data: {"choices":[{"delta":{"content":"ok"}}]}\n\n', "data: [DONE]\n\n"])));
+    });
+    const out: string[] = [];
+    for await (const t of new MuseConnector("KEY").stream({ system: "", user: "", images: [] }, new AbortController().signal)) out.push(t);
+    expect(out).toEqual(["ok"]);
+  });
 });
+
+afterEach(() => vi.unstubAllGlobals());

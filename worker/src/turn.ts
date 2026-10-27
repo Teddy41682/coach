@@ -43,7 +43,9 @@ export function runTurn(req: TurnRequest, model: ModelConnector, timeoutMs = TUR
           send({ type: "text", text: next.value });
         }
         send({ type: "done" });
-      } catch {
+      } catch (error) {
+        // The cook hears an apology; the log keeps the cause, or a failing model would look like silence.
+        console.error("turn failed", req.sessionId, req.stepIndex, error instanceof Error ? error.message : String(error));
         send({ type: "error", text: APOLOGY });
       } finally {
         clearTimeout(timer);

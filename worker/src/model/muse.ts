@@ -12,7 +12,8 @@ export class MuseConnector implements ModelConnector {
     private readonly apiKey: string,
     private readonly model = "muse-spark-1.3",
     private readonly effort = "minimal",
-    private readonly fetchImpl: typeof fetch = fetch,
+    // Wrapped, not passed bare: Workers throws "Illegal invocation" when fetch is called through a reference.
+    private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init),
     private readonly maxTokens = 400,
   ) {
     if (model.includes("contributor")) throw new Error(`${model}: Coach uses the standard tier only`);
