@@ -32,8 +32,10 @@ export const cooking: ExpertisePack = {
     ].join("\n");
   },
   user(ctx) {
-    const seen = `(Noted going in so far this step: ${ctx.seen.join(", ") || "nothing noted yet"}.)`;
-    const blind = ctx.hasPhotos ? "" : "\n(No photo came with this question: answer from the recipe, and don't describe what you see.)";
-    return `${ctx.utterance}\n${seen}${blind}`;
+    const lines = [ctx.utterance];
+    if (ctx.seen.length > 0) lines.push(`(Noted going in so far this step: ${ctx.seen.join(", ")}.)`);
+    // Without photos there is nothing to judge, so "nothing noted" must not read as "missing".
+    if (!ctx.hasPhotos) lines.push("(No photo came with this question: answer from the recipe, don't describe what you see, and don't say an ingredient is missing.)");
+    return lines.join("\n");
   },
 };

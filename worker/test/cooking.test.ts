@@ -39,10 +39,6 @@ describe("the cooking pack", () => {
     expect(u).toContain("water, psyllium husk");
   });
 
-  it("says when nothing has been seen yet", () => {
-    expect(cooking.user(ctx({ seen: [] }))).toContain("nothing noted yet");
-  });
-
   it("still names the dish for a recipe with no steps", () => {
     const s = cooking.system(ctx({ recipe: { title: "Toast", ingredients: [], steps: [] }, stepIndex: 0, stepIngredients: [] }));
     expect(s).toContain("Toast");
@@ -56,5 +52,14 @@ describe("the cooking pack", () => {
   it("tells the model not to describe what it sees when no photo came with the question", () => {
     expect(cooking.user(ctx({ hasPhotos: false }))).toContain("No photo came with this question");
     expect(cooking.user(ctx({ hasPhotos: true }))).not.toContain("No photo");
+  });
+
+  it("only hunts for missing ingredients when it has photos to judge", () => {
+    expect(cooking.user(ctx({ hasPhotos: false }))).toContain("don't say an ingredient is missing");
+    expect(cooking.user(ctx({ hasPhotos: true }))).not.toContain("don't say an ingredient is missing");
+  });
+
+  it("leaves out the 'noted so far' line when nothing has been noted", () => {
+    expect(cooking.user(ctx({ seen: [] }))).not.toContain("Noted going in");
   });
 });
