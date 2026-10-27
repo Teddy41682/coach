@@ -6,8 +6,8 @@
 export const DEVICE_DAILY_TURNS = 150;
 export const GLOBAL_DAILY_CENTS = 1_500;
 export const LIMIT_LINE = "I've reached today's limit — try again tomorrow.";
-/** Session start: linking reasons, then answers with up to 2,000 tokens (~0.9¢ at $4.25/M); charged 2¢. */
-export const LINK_CENTS = 2;
+/** Session start: planning reasons, then answers with up to 4,000 tokens (~1.7¢ at $4.25/M) plus the recipe; charged 3¢. */
+export const LINK_CENTS = 3;
 
 /**
  * An upper bound on one question's cost, in whole cents: 1¢ for the prompt and answer, plus 1¢ per 4 photos

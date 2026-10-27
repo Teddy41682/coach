@@ -1,11 +1,12 @@
 import type { CoachRecipe } from "./expertise/pack";
+import type { StepPlan } from "./link";
 
 export type SessionRow = {
   id: string;
   device: string;
   recipe: CoachRecipe;
-  /** Ingredient names per step, from `linkSteps`. */
-  links: string[][];
+  /** Per step, from `linkSteps`: the ingredients that go in, and the briefing. */
+  links: StepPlan[];
   createdAt: number;
 };
 
@@ -35,7 +36,13 @@ export class D1SessionStore implements SessionStore {
       .bind(id)
       .first<{ id: string; device: string; recipe_json: string; links_json: string; created_at: number }>();
     return row
-      ? { id: row.id, device: row.device, recipe: JSON.parse(row.recipe_json), links: JSON.parse(row.links_json), createdAt: row.created_at }
+      ? { id: row.id, device: row.device, recipe: JSON.parse(row.recipe_json), links: upgrade(JSON.parse(row.links_json)), createdAt: row.created_at }
       : null;
   }
+}
+
+/** Sessions stored before briefings held plain ingredient lists per step. */
+function upgrade(links: unknown): StepPlan[] {
+  if (!Array.isArray(links)) return [];
+  return links.map((l) => (Array.isArray(l) ? { ingredients: l as string[], done: "", mistakes: "", tip: "" } : (l as StepPlan)));
 }

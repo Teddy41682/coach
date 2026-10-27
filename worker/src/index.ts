@@ -19,8 +19,8 @@ export interface Env {
 /** `link` answers are long JSON after the model has reasoned, so linking gets a bigger token allowance. */
 export type Purpose = "turn" | "link";
 export type Deps = { store: SessionStore; usage: UsageStore; model: (purpose: Purpose) => ModelConnector; now: () => number };
-/** Measured 2026-10-27: a 7-step, 13-ingredient recipe used 281 reasoning + ~90 answer tokens; 400 truncated it. */
-export const LINK_MAX_TOKENS = 2_000;
+/** Measured 2026-10-27: linking alone used 281 reasoning + ~90 answer tokens and 400 truncated it; briefings add ~60 tokens a step. */
+export const LINK_MAX_TOKENS = 4_000;
 
 /** What one turn may carry. A glasses frame at 720 px and JPEG 0.5 is ~60 KB of base64; these leave headroom. */
 export const MAX_FRAMES = 8;
@@ -113,7 +113,13 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const links = await linkSteps(recipe, deps.model("link"));
     const id = crypto.randomUUID();
     await deps.store.put({ id, device, recipe, links, createdAt: deps.now() });
-    return Response.json({ sessionId: id, steps: recipe.steps.map((text, index) => ({ index, text, ingredients: links[index] ?? [] })) });
+    return Response.json({
+      sessionId: id,
+      steps: recipe.steps.map((text, index) => {
+        const p = links[index] ?? { ingredients: [], done: "", mistakes: "", tip: "" };
+        return { index, text, ingredients: p.ingredients, briefing: { done: p.done, mistakes: p.mistakes, tip: p.tip } };
+      }),
+    });
   }
 
   if (url.pathname === "/v1/turn") {
@@ -130,9 +136,11 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
       const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
       return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
     }
+    const plan = session.links[Math.min(turn.stepIndex, Math.max(session.links.length - 1, 0))];
     const ctx = {
       recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
-      stepIngredients: session.links[Math.min(turn.stepIndex, Math.max(session.links.length - 1, 0))] ?? [],
+      stepIngredients: plan?.ingredients ?? [],
+      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "" },
       hasPhotos: turn.frames.length > 0,
       history: turn.history ?? [],
     };

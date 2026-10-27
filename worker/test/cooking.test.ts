@@ -12,6 +12,7 @@ const ctx = (over: Partial<PackContext> = {}): PackContext => ({
   utterance: "Is this gel thick enough?",
   seen: ["water", "psyllium husk"],
   stepIngredients: ["whole psyllium husk"],
+  briefing: { done: "Thick enough to hold a spoon upright.", mistakes: "Adding the flour before it gels.", tip: "Whisk hard for 30 seconds so it gels evenly." },
   hasPhotos: true,
   history: [],
   ...over,
@@ -76,5 +77,16 @@ describe("the cooking pack", () => {
     expect(s).toContain("If the cook asks to move on, move on");
     expect(s).toContain("ask them to show you");
     expect(s).toContain("Never repeat a tip you already gave");
+  });
+
+  it("judges against the step's briefing", () => {
+    const s = cooking.system(ctx());
+    expect(s).toContain("Done when: Thick enough to hold a spoon upright.");
+    expect(s).toContain("Common mistakes: Adding the flour before it gels.");
+    expect(s).toContain("A tip you may offer once: Whisk hard for 30 seconds so it gels evenly.");
+  });
+
+  it("leaves out an empty briefing", () => {
+    expect(cooking.system(ctx({ briefing: { done: "", mistakes: "", tip: "" } }))).not.toContain("Done when:");
   });
 });

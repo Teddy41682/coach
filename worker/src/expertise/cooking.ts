@@ -34,6 +34,9 @@ export const cooking: ExpertisePack = {
       `Ingredients: ${ingredients}`,
       stepLine(ctx),
       `This step uses: ${ctx.stepIngredients.join(", ") || "nothing specific"}`,
+      ...(ctx.briefing.done ? [`Done when: ${ctx.briefing.done}`] : []),
+      ...(ctx.briefing.mistakes ? [`Common mistakes: ${ctx.briefing.mistakes}`] : []),
+      ...(ctx.briefing.tip ? [`A tip you may offer once: ${ctx.briefing.tip}`] : []),
     ].join("\n");
   },
   user(ctx) {

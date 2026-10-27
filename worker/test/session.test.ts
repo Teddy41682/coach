@@ -11,7 +11,7 @@ const recipe = { title: "Pancakes", ingredients: [{ amount: "200 g", item: "flou
 function deps(model: ModelConnector, purposes: string[] = []) {
   return { store: new MemorySessionStore(), usage: new MemoryUsageStore(), model: (p: "turn" | "link") => { purposes.push(p); return model; }, now: () => 1_000 };
 }
-const linker: ModelConnector = { async *stream() { yield '{"steps":[["flour"],["eggs"]]}'; } };
+const linker: ModelConnector = { async *stream() { yield '{"steps":[{"ingredients":["flour"],"done":"No lumps."},{"ingredients":["eggs"]}]}'; } };
 
 describe("POST /v1/session", () => {
   it("creates a session and returns the linked steps", async () => {
@@ -19,8 +19,11 @@ describe("POST /v1/session", () => {
     const r = await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: H, body: JSON.stringify({ recipe }) }), env, d);
     expect(r.status).toBe(200);
     const body = await r.json() as { sessionId: string; steps: unknown };
-    expect(body.steps).toEqual([{ index: 0, text: "Whisk the flour.", ingredients: ["flour"] }, { index: 1, text: "Beat in the eggs.", ingredients: ["eggs"] }]);
-    expect(await d.store.get(body.sessionId)).toMatchObject({ device: "dev-1", links: [["flour"], ["eggs"]] });
+    expect(body.steps).toEqual([
+      { index: 0, text: "Whisk the flour.", ingredients: ["flour"], briefing: { done: "No lumps.", mistakes: "", tip: "" } },
+      { index: 1, text: "Beat in the eggs.", ingredients: ["eggs"], briefing: { done: "", mistakes: "", tip: "" } },
+    ]);
+    expect((await d.store.get(body.sessionId))?.links[0]).toMatchObject({ ingredients: ["flour"], done: "No lumps." });
   });
   it("needs a device header", async () => {
     const { "X-Coach-Device": _, ...noDevice } = H;
@@ -41,7 +44,7 @@ describe("POST /v1/turn with sessions", () => {
   });
   it("frames the question with the session's recipe and the step's ingredients", async () => {
     let system = "";
-    const model: ModelConnector = { async *stream(req) { if (req.system.includes("Recipe:")) system = req.system; yield '{"steps":[["flour"],["eggs"]]}'; } };
+    const model: ModelConnector = { async *stream(req) { if (req.system.includes("Recipe:")) system = req.system; yield '{"steps":[{"ingredients":["flour"]},{"ingredients":["eggs"],"done":"Smooth."}]}'; } };
     const d = deps(model);
     const made = await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: H, body: JSON.stringify({ recipe }) }), env, d);
     const { sessionId } = await made.json() as { sessionId: string };
@@ -50,6 +53,7 @@ describe("POST /v1/turn with sessions", () => {
     await r.text();
     expect(system).toContain("Step 2 of 2: Beat in the eggs.");
     expect(system).toContain("This step uses: eggs");
+    expect(system).toContain("Done when: Smooth.");
   });
 });
 
