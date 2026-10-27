@@ -14,6 +14,8 @@ export type PackContext = {
   seen: string[];
   /** The ingredients that belong to the current step (step–ingredient linking). */
   stepIngredients: string[];
+  /** Whether frames came with this question; without them the coach must not describe what it "sees". */
+  hasPhotos: boolean;
 };
 
 /**

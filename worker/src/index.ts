@@ -123,6 +123,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const ctx = {
       recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
       stepIngredients: session.links[Math.min(turn.stepIndex, Math.max(session.links.length - 1, 0))] ?? [],
+      hasPhotos: turn.frames.length > 0,
     };
     return new Response(runTurn(turn, deps.model("turn"), { system: cooking.system(ctx), user: cooking.user(ctx) }), {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },

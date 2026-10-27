@@ -12,6 +12,7 @@ const ctx = (over: Partial<PackContext> = {}): PackContext => ({
   utterance: "Is this gel thick enough?",
   seen: ["water", "psyllium husk"],
   stepIngredients: ["whole psyllium husk"],
+  hasPhotos: true,
   ...over,
 });
 
@@ -50,5 +51,10 @@ describe("the cooking pack", () => {
 
   it("clamps a step index past the end to the last step", () => {
     expect(cooking.system(ctx({ stepIndex: 9 }))).toContain("Step 2 of 2");
+  });
+
+  it("tells the model not to describe what it sees when no photo came with the question", () => {
+    expect(cooking.user(ctx({ hasPhotos: false }))).toContain("No photo came with this question");
+    expect(cooking.user(ctx({ hasPhotos: true }))).not.toContain("No photo");
   });
 });

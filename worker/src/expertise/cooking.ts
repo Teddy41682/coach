@@ -32,6 +32,8 @@ export const cooking: ExpertisePack = {
     ].join("\n");
   },
   user(ctx) {
-    return `${ctx.utterance}\n(Noted going in so far this step: ${ctx.seen.join(", ") || "nothing noted yet"}.)`;
+    const seen = `(Noted going in so far this step: ${ctx.seen.join(", ") || "nothing noted yet"}.)`;
+    const blind = ctx.hasPhotos ? "" : "\n(No photo came with this question: answer from the recipe, and don't describe what you see.)";
+    return `${ctx.utterance}\n${seen}${blind}`;
   },
 };
