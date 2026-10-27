@@ -3,7 +3,9 @@ import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
+import { checkAndCount, D1UsageStore, hstDay, LIMIT_LINE, type UsageStore } from "./limits";
 import { D1SessionStore, type SessionStore } from "./session";
+import { encodeEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
 
 export interface Env {
@@ -16,7 +18,7 @@ export interface Env {
 /** What the routes need from the world, so tests can swap the store and the model. */
 /** `link` answers are long JSON after the model has reasoned, so linking gets a bigger token allowance. */
 export type Purpose = "turn" | "link";
-export type Deps = { store: SessionStore; model: (purpose: Purpose) => ModelConnector; now: () => number };
+export type Deps = { store: SessionStore; usage: UsageStore; model: (purpose: Purpose) => ModelConnector; now: () => number };
 /** Measured 2026-10-27: a 7-step, 13-ingredient recipe used 281 reasoning + ~90 answer tokens; 400 truncated it. */
 export const LINK_MAX_TOKENS = 2_000;
 
@@ -97,6 +99,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (!device || device.length > 100) return bad(400, "no_device");
     const recipe = (got.body as { recipe?: unknown } | null)?.recipe;
     if (!isRecipe(recipe)) return bad(400, "bad_recipe");
+    if ((await checkAndCount(deps.usage, device, hstDay(deps.now()))) !== "ok") return bad(429, "daily_limit");
     const links = await linkSteps(recipe, deps.model("link"));
     const id = crypto.randomUUID();
     await deps.store.put({ id, device, recipe, links, createdAt: deps.now() });
@@ -108,8 +111,15 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (got instanceof Response) return got;
     if (!isTurn(got.body)) return bad(400, "bad_request");
     const turn = got.body;
+    const device = request.headers.get("X-Coach-Device");
+    if (!device || device.length > 100) return bad(400, "no_device");
     const session = await deps.store.get(turn.sessionId);
     if (!session) return bad(404, "unknown_session");
+    if ((await checkAndCount(deps.usage, device, hstDay(deps.now()))) !== "ok") {
+      // Spoken like any answer, so the cook hears why; the model is never asked.
+      const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
+      return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+    }
     const ctx = {
       recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
       stepIngredients: session.links[Math.min(turn.stepIndex, Math.max(session.links.length - 1, 0))] ?? [],
@@ -126,6 +136,7 @@ export default {
   fetch(request: Request, env: Env): Promise<Response> {
     return handle(request, env, {
       store: new D1SessionStore(env.DB as D1Database),
+      usage: new D1UsageStore(env.DB as D1Database),
       model: (purpose) => purpose === "link"
         ? new MuseConnector(env.MODEL_API_KEY, "muse-spark-1.3", "minimal", undefined, LINK_MAX_TOKENS)
         : new MuseConnector(env.MODEL_API_KEY),

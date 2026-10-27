@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
 import { MemorySessionStore } from "../src/session";
+import { MemoryUsageStore } from "../src/limits";
 import type { ModelConnector } from "../src/model/connector";
 
 const env = { MODEL_API_KEY: "k", COACH_APP_KEY: "app" };
@@ -8,7 +9,7 @@ const H = { "Content-Type": "application/json", "X-Coach-Key": "app", "X-Coach-D
 const recipe = { title: "Pancakes", ingredients: [{ amount: "200 g", item: "flour" }, { amount: "2", item: "eggs" }], steps: ["Whisk the flour.", "Beat in the eggs."] };
 
 function deps(model: ModelConnector, purposes: string[] = []) {
-  return { store: new MemorySessionStore(), model: (p: "turn" | "link") => { purposes.push(p); return model; }, now: () => 1_000 };
+  return { store: new MemorySessionStore(), usage: new MemoryUsageStore(), model: (p: "turn" | "link") => { purposes.push(p); return model; }, now: () => 1_000 };
 }
 const linker: ModelConnector = { async *stream() { yield '{"steps":[["flour"],["eggs"]]}'; } };
 
