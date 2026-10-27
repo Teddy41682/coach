@@ -40,13 +40,13 @@ describe("runTurn", () => {
     const events = await collect(runTurn(req(), model));
     expect(events[0].event.type).toBe("ack");
     expect(events[0].at).toBeLessThan(100);
-    expect(events.slice(1).map((e) => e.event)).toEqual([{ type: "text", text: "Looks good." }, { type: "done" }]);
+    expect(events.slice(1).map((e) => e.event)).toEqual([{ type: "text", text: "Looks good." }, { type: "action", action: "stay" }, { type: "done" }]);
   });
 
   it("acks only when frames are sent", async () => {
     const model = fake(async function* () { yield "Step two: fold it in."; });
     const events = await collect(runTurn(req({ frames: [] }), model));
-    expect(events.map((e) => e.event.type)).toEqual(["text", "done"]);
+    expect(events.map((e) => e.event.type)).toEqual(["text", "action", "done"]);
   });
 
   it("turns a model error into a spoken apology", async () => {
@@ -72,5 +72,18 @@ describe("runTurn", () => {
     await collect(runTurn(req({ frames: ["F1", "F2"] }), model));
     expect(seen!.images).toEqual(["F1", "F2"]);
     expect(seen!.user).toContain("Is this mixed enough?");
+  });
+
+  it("turns a trailing [[next]] into an action, unspoken", async () => {
+    const model = fake(async function* () { yield "Nicely drained. On to the bowl. ["; yield "[next]]"; });
+    const events = (await collect(runTurn(req(), model))).map((e) => e.event);
+    expect(events.filter((e) => e.type === "text").map((e) => (e as { text: string }).text).join("")).toBe("Nicely drained. On to the bowl. ");
+    expect(events.slice(-2)).toEqual([{ type: "action", action: "next" }, { type: "done" }]);
+  });
+
+  it("an apology carries no action", async () => {
+    const model = fake(async function* () { throw new Error("boom"); });
+    const events = (await collect(runTurn(req(), model))).map((e) => e.event);
+    expect(events.some((e) => e.type === "action")).toBe(false);
   });
 });

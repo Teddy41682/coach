@@ -1,4 +1,5 @@
 import type { ModelConnector } from "./model/connector";
+import { ControlFilter } from "./control";
 import { encodeEvent, type CoachEvent } from "./sse";
 
 export type TurnRequest = {
@@ -49,11 +50,16 @@ export function runTurn(
           { ...prompt, images: req.frames },
           abort.signal,
         )[Symbol.asyncIterator]();
+        const control = new ControlFilter();
         for (;;) {
           const next = await Promise.race([it.next(), timedOut]);
           if (next.done) break;
-          send({ type: "text", text: next.value });
+          const speak = control.push(next.value);
+          if (speak) send({ type: "text", text: speak });
         }
+        const end = control.end();
+        if (end.speak) send({ type: "text", text: end.speak });
+        send({ type: "action", action: end.action });
         send({ type: "done" });
       } catch (error) {
         // The cook hears an apology; the log keeps the cause, or a failing model would look like silence.
