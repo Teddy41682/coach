@@ -2,5 +2,9 @@
   "name": "coach",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  "workers_dev": true
+  "workers_dev": true,
+  "d1_databases": [
+    { "binding": "DB", "database_name": "coach", "database_id": "84c6cd0b-8950-4505-9d2e-d337180f4cfc", "migrations_dir": "migrations" }
+  ],
+  "observability": { "enabled": true }
 }
