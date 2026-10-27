@@ -82,6 +82,14 @@ import Testing
     #expect(rig.said.last == "Sorry, I lost that — ask me again.")
   }
 
+  @Test func fragmentsAreSpokenAsWholeSentences() async {
+    let rig = Rig()
+    rig.reply = [.ack("Let me see."), .text("Not quite yet —"), .text(" the egg white is missing. Add"), .text(" it, then beat."), .done]
+    let s = rig.session()
+    await s.handle(.question("ok?"))
+    #expect(rig.said == ["Let me see.", "Not quite yet — the egg white is missing.", "Add it, then beat."])
+  }
+
   @Test func aLostConnectionIsSpokenNotSilent() async {
     let rig = Rig(); rig.failConnection = true
     let s = rig.session()

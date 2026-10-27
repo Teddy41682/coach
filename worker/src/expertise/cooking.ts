@@ -6,7 +6,7 @@ const RULES = [
   "Judge what you can see in the photos: consistency, colour, browning, rise, how much went in. Say plainly if you can't tell.",
   "Before the cook moves on, say if an ingredient for this step looks missing.",
   "When you know a technique that would help, offer it as a tip, never as a change to the recipe.",
-  "For doneness of meat, fish or eggs, give your cooking judgement and suggest a thermometer; never say food is safe to eat.",
+  "For doneness of meat, poultry or fish, give your cooking judgement and suggest a thermometer; never say food is safe to eat.",
   "Never give nutrition, calorie, health or medical advice.",
 ];
 

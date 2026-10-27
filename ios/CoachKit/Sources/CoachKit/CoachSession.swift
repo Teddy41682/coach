@@ -66,14 +66,27 @@ public final class CoachSession {
 
   private func ask(_ utterance: String) async {
     let turn = TurnRequest(sessionId: sessionId, stepIndex: stepIndex, utterance: utterance, frames: frames(), seen: [])
+    // Text arrives in fragments; it is spoken a whole sentence at a time, and whatever is left when the turn ends.
+    var pending = ""
+    func flush() {
+      let rest = pending.trimmingCharacters(in: .whitespaces)
+      if !rest.isEmpty { say(rest) }
+      pending = ""
+    }
     do {
       for try await event in send(turn) {
         switch event {
-        case .ack(let line), .text(let line), .error(let line): say(line)
-        case .done: break
+        case .ack(let line): say(line)
+        case .text(let piece):
+          pending += piece
+          completeSentences(&pending).forEach(say)
+        case .error(let line): flush(); say(line)
+        case .done: flush()
         }
       }
+      flush()
     } catch {
+      flush()
       // The connection itself failed (no signal, server down): still never silence.
       say(Self.lostLine)
     }
