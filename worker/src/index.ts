@@ -31,6 +31,12 @@ export const MAX_BODY_BYTES = 4_000_000;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
 const str = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
+/** Plain ids only: never '*', which names the day-total row in the usage table. */
+const DEVICE_ID = /^[A-Za-z0-9._-]{1,100}$/;
+const deviceOf = (request: Request) => {
+  const d = request.headers.get("X-Coach-Device");
+  return d && DEVICE_ID.test(d) ? d : null;
+};
 
 function isTurn(b: unknown): b is TurnRequest {
   const t = b as TurnRequest;
@@ -95,8 +101,8 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
   if (url.pathname === "/v1/session") {
     const got = await admit(request, env);
     if (got instanceof Response) return got;
-    const device = request.headers.get("X-Coach-Device");
-    if (!device || device.length > 100) return bad(400, "no_device");
+    const device = deviceOf(request);
+    if (!device) return bad(400, "no_device");
     const recipe = (got.body as { recipe?: unknown } | null)?.recipe;
     if (!isRecipe(recipe)) return bad(400, "bad_recipe");
     if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), LINK_CENTS)) !== "ok") return bad(429, "daily_limit");
@@ -111,8 +117,8 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (got instanceof Response) return got;
     if (!isTurn(got.body)) return bad(400, "bad_request");
     const turn = got.body;
-    const device = request.headers.get("X-Coach-Device");
-    if (!device || device.length > 100) return bad(400, "no_device");
+    const device = deviceOf(request);
+    if (!device) return bad(400, "no_device");
     const session = await deps.store.get(turn.sessionId);
     if (!session) return bad(404, "unknown_session");
     if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), costOf(turn.frames.length))) !== "ok") {

@@ -74,4 +74,14 @@ describe("a capped turn", () => {
     }), { MODEL_API_KEY: "k", COACH_APP_KEY: "app" }, deps);
     expect(r.status).toBe(400);
   });
+  it("refuses a device id that isn't plain letters, digits, - _ or . (e.g. the global row's '*')", async () => {
+    const deps = { store: new MemorySessionStore(), usage: new MemoryUsageStore(), model: () => ({ async *stream() { yield ""; } }), now: () => 0 };
+    for (const device of ["*", "a b", "x;DROP", ""]) {
+      const r = await worker.handle(new Request("https://c/v1/session", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Coach-Key": "app", "X-Coach-Device": device },
+        body: JSON.stringify({ recipe: { title: "T", ingredients: [], steps: [] } }),
+      }), { MODEL_API_KEY: "k", COACH_APP_KEY: "app" }, deps);
+      expect(r.status, device).toBe(400);
+    }
+  });
 });
