@@ -19,6 +19,14 @@ public final class GlassesDevice: CoachDevice {
   /// `fps` must be one the toolkit accepts: 2, 7, 15, 24 or 30.
   public init(fps: UInt = 2) { self.fps = fps }
 
+  public enum Failure: LocalizedError {
+    case notWorn
+    public var errorDescription: String? { "Put your glasses on and unfold them, then try again." }
+  }
+
+  /// How long to wait for the glasses to be worn before giving up.
+  public var wearTimeout: Duration = .seconds(60)
+
   /// Call once at launch, before anything else touches the glasses.
   public static func configure() throws { try Wearables.configure() }
 
@@ -41,7 +49,19 @@ public final class GlassesDevice: CoachDevice {
       }
     }
 
-    let session = try wearables.createSession(deviceSelector: AutoDeviceSelector(wearables: wearables))
+    // Glasses only count as eligible once they're on, unfolded and awake — Meta's sample waits for this too.
+    // Creating the session before then fails with "No eligible device available".
+    let selector = AutoDeviceSelector(wearables: wearables)
+    let worn = await withTaskGroup(of: Bool.self) { group in
+      group.addTask { for await id in selector.activeDeviceStream() where id != nil { return true }; return false }
+      group.addTask { [wearTimeout] in try? await Task.sleep(for: wearTimeout); return false }
+      let first = await group.next() ?? false
+      group.cancelAll()
+      return first
+    }
+    guard worn else { throw Failure.notWorn }
+
+    let session = try wearables.createSession(deviceSelector: selector)
     self.session = session
     Task { [weak self] in
       for await state in session.stateStream() { self?.sessionChanged(state) }
