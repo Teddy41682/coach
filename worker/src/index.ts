@@ -25,6 +25,25 @@ function isTurn(b: unknown): b is TurnRequest {
     && Array.isArray(t.seen) && t.seen.length <= MAX_SEEN && t.seen.every((s) => typeof s === "string" && s.length <= 100);
 }
 
+/** The body as text, or null once it passes `max` bytes — counted as it streams, whatever Content-Length claims. */
+async function readBounded(request: Request, max: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) { await reader.cancel(); return null; }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { all.set(c, at); at += c.byteLength; }
+  return new TextDecoder().decode(all);
+}
+
 /** Constant-time compare, so the key can't be guessed a character at a time from response timing. */
 function sameKey(given: string | null, expected: string): boolean {
   if (!given || !expected || given.length !== expected.length) return false;
@@ -43,7 +62,10 @@ export default {
       if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) {
         return Response.json({ error: "too_large" }, { status: 413 });
       }
-      const body = await request.json().catch(() => null);
+      const text = await readBounded(request, MAX_BODY_BYTES);
+      if (text === null) return Response.json({ error: "too_large" }, { status: 413 });
+      let body: unknown = null;
+      try { body = JSON.parse(text); } catch { /* falls through to bad_request */ }
       if (!isTurn(body)) return Response.json({ error: "bad_request" }, { status: 400 });
       return new Response(runTurn(body, new MuseConnector(env.MODEL_API_KEY)), {
         headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },

@@ -36,4 +36,15 @@ describe("the /v1/turn door", () => {
     });
     expect((await worker.fetch(req, env)).status).toBe(413);
   });
+  it("refuses an oversized body that doesn't declare its length", async () => {
+    const big = new TextEncoder().encode("x".repeat(64 * 1024));
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) { if (sent > MAX_BODY_BYTES) return c.close(); sent += big.length; c.enqueue(big); },
+    });
+    const req = new Request("https://coach.test/v1/turn", {
+      method: "POST", headers: { "X-Coach-Key": "app-secret" }, body, duplex: "half",
+    } as RequestInit);
+    expect((await worker.fetch(req, env)).status).toBe(413);
+  });
 });
