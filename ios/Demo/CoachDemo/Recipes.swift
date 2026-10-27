@@ -1,7 +1,37 @@
 import CoachKit
 
-/// His own recipe (Osito's Gluten-Free Crusty Boule), as the demo's built-in dish.
+/// The demo's built-in dishes: his own boule, and two quick lunches for test cooks.
 enum Recipes {
+  static let all = [quesadilla, eggs, boule]
+
+  static let quesadilla = CoachRecipe(
+    title: "Cheese Quesadilla",
+    ingredients: [
+      .init(amount: "1", item: "large flour tortilla"), .init(amount: "1 cup", item: "shredded cheese"),
+      .init(amount: "1 tsp", item: "butter"), .init(amount: "to taste", item: "salsa"),
+    ],
+    steps: [
+      "Heat a pan over medium heat and melt the butter in it.",
+      "Lay the tortilla in the pan and scatter the cheese over one half.",
+      "Fold the tortilla over the cheese and cook until the bottom is golden brown, about 2 minutes.",
+      "Flip it and cook the other side until golden and the cheese has melted, about 2 minutes.",
+      "Slide it onto a board, cut it into wedges and serve with salsa.",
+    ])
+
+  static let eggs = CoachRecipe(
+    title: "Scrambled Eggs on Toast",
+    ingredients: [
+      .init(amount: "3", item: "eggs"), .init(amount: "1 tbsp", item: "butter"),
+      .init(amount: "1 pinch", item: "salt"), .init(amount: "2 slices", item: "bread"),
+    ],
+    steps: [
+      "Put the bread in the toaster.",
+      "Crack the eggs into a bowl, add the salt and beat them with a fork.",
+      "Melt the butter in a pan over low heat.",
+      "Pour in the eggs and stir slowly until they're just set but still glossy.",
+      "Spoon the eggs onto the toast and serve straight away.",
+    ])
+
   static let boule = CoachRecipe(
     title: "Gluten-Free Crusty Boule",
     ingredients: [
