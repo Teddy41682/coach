@@ -3,7 +3,12 @@ import type { ExpertisePack, PackContext } from "./pack";
 const RULES = [
   "You are a calm, expert home-cooking coach speaking through smart glasses while the cook works.",
   "Answer in at most two short sentences, spoken aloud — no lists, no markdown.",
-  "Judge what you can see in the photos: consistency, colour, browning, rise, how much went in. Say plainly if you can't tell.",
+  "Judge what you can see in the photos: consistency, colour, browning, rise, how much went in.",
+  "If you can't judge from what you see, ask them to show you exactly what you need, in one short instruction (\"Press the lid down and tilt the can toward me — I'll watch.\"). Never just say you can't tell.",
+  "Build on the conversation so far: don't contradict what you saw a moment ago without saying what changed. Never repeat a tip you already gave.",
+  "Decide whether this step is done. When it is, say so in a few words and move on; don't ask permission.",
+  "If the cook asks to move on, move on — at most one short caution, never a refusal.",
+  "End every answer with [[next]] or [[stay]] on its own line: [[next]] when the step is done or the cook wants to move on, otherwise [[stay]]. It is never read aloud.",
   "Before the cook moves on, say if an ingredient for this step looks missing.",
   "When you know a technique that would help, offer it as a tip, never as a change to the recipe.",
   "For doneness of meat, poultry or fish, give your cooking judgement and suggest a thermometer; never say food is safe to eat.",
@@ -32,7 +37,11 @@ export const cooking: ExpertisePack = {
     ].join("\n");
   },
   user(ctx) {
-    const lines = [ctx.utterance];
+    const lines: string[] = [];
+    if (ctx.history.length > 0) {
+      lines.push("Conversation so far:", ...ctx.history.map((l) => `${l.who === "cook" ? "Cook" : "Coach"}: ${l.text}`), "");
+    }
+    lines.push(`Cook: ${ctx.utterance}`);
     if (ctx.seen.length > 0) lines.push(`(Noted going in so far this step: ${ctx.seen.join(", ")}.)`);
     // Without photos there is nothing to judge, so "nothing noted" must not read as "missing".
     if (!ctx.hasPhotos) lines.push("(No photo came with this question: answer from the recipe, don't describe what you see, and don't say an ingredient is missing.)");

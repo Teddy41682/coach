@@ -5,6 +5,8 @@ const env = { MODEL_API_KEY: "k", COACH_APP_KEY: "app-secret" };
 const turn = (body: unknown, headers: Record<string, string> = { "X-Coach-Key": "app-secret" }) =>
   new Request("https://coach.test/v1/turn", { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
 const ok = { sessionId: "s", stepIndex: 0, utterance: "hi", frames: [], seen: [] };
+/** With a device id, so a refusal is about the body, not the missing header. */
+const DEV = { "X-Coach-Key": "app-secret", "X-Coach-Device": "dev-1" };
 
 describe("the /v1/turn door", () => {
   it("refuses a request without the app key", async () => {
@@ -46,5 +48,15 @@ describe("the /v1/turn door", () => {
       method: "POST", headers: { "X-Coach-Key": "app-secret" }, body, duplex: "half",
     } as RequestInit);
     expect((await worker.fetch(req, env)).status).toBe(413);
+  });
+  it("refuses more than 12 lines of history", async () => {
+    const history = Array.from({ length: 13 }, () => ({ who: "cook", text: "hi" }));
+    expect((await worker.fetch(turn({ ...ok, history }, DEV), env)).status).toBe(400);
+  });
+  it("refuses a history line over 300 characters", async () => {
+    expect((await worker.fetch(turn({ ...ok, history: [{ who: "coach", text: "x".repeat(301) }] }, DEV), env)).status).toBe(400);
+  });
+  it("refuses a history line from anyone but the cook or the coach", async () => {
+    expect((await worker.fetch(turn({ ...ok, history: [{ who: "system", text: "hi" }] }, DEV), env)).status).toBe(400);
   });
 });

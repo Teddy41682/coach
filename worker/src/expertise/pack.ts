@@ -16,6 +16,8 @@ export type PackContext = {
   stepIngredients: string[];
   /** Whether frames came with this question; without them the coach must not describe what it "sees". */
   hasPhotos: boolean;
+  /** The conversation so far, oldest first. */
+  history: { who: "cook" | "coach"; text: string }[];
 };
 
 /**

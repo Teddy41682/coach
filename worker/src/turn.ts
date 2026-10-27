@@ -9,7 +9,11 @@ export type TurnRequest = {
   frames: string[];
   /** What the coach has noted going in so far this step. */
   seen: string[];
+  /** The conversation so far, oldest first (at most 12 lines), so the coach builds on what it already said. */
+  history?: Line[];
 };
+
+export type Line = { who: "cook" | "coach"; text: string };
 
 /** A model that hasn't finished by now is cut off and the cook hears the apology instead of silence. */
 export const TURN_TIMEOUT_MS = 12_000;

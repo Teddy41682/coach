@@ -27,6 +27,8 @@ export const MAX_FRAMES = 8;
 export const MAX_FRAME_CHARS = 400_000;
 export const MAX_UTTERANCE = 500;
 export const MAX_SEEN = 50;
+export const MAX_HISTORY = 12;
+export const MAX_LINE = 300;
 export const MAX_BODY_BYTES = 4_000_000;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
@@ -45,7 +47,9 @@ function isTurn(b: unknown): b is TurnRequest {
     && str(t.utterance, MAX_UTTERANCE)
     && Array.isArray(t.frames) && t.frames.length <= MAX_FRAMES
     && t.frames.every((f) => str(f, MAX_FRAME_CHARS) && BASE64.test(f))
-    && Array.isArray(t.seen) && t.seen.length <= MAX_SEEN && t.seen.every((s) => str(s, 100));
+    && Array.isArray(t.seen) && t.seen.length <= MAX_SEEN && t.seen.every((s) => str(s, 100))
+    && (t.history === undefined || (Array.isArray(t.history) && t.history.length <= MAX_HISTORY
+      && t.history.every((l) => !!l && (l.who === "cook" || l.who === "coach") && str(l.text, MAX_LINE))));
 }
 
 function isRecipe(r: unknown): r is CoachRecipe {
@@ -130,6 +134,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
       recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
       stepIngredients: session.links[Math.min(turn.stepIndex, Math.max(session.links.length - 1, 0))] ?? [],
       hasPhotos: turn.frames.length > 0,
+      history: turn.history ?? [],
     };
     return new Response(runTurn(turn, deps.model("turn"), { system: cooking.system(ctx), user: cooking.user(ctx) }), {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },

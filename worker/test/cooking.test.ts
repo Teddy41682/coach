@@ -13,6 +13,7 @@ const ctx = (over: Partial<PackContext> = {}): PackContext => ({
   seen: ["water", "psyllium husk"],
   stepIngredients: ["whole psyllium husk"],
   hasPhotos: true,
+  history: [],
   ...over,
 });
 
@@ -61,5 +62,19 @@ describe("the cooking pack", () => {
 
   it("leaves out the 'noted so far' line when nothing has been noted", () => {
     expect(cooking.user(ctx({ seen: [] }))).not.toContain("Noted going in");
+  });
+
+  it("lists the conversation so far, cook and coach", () => {
+    const u = cooking.user(ctx({ history: [{ who: "cook", text: "is it drained?" }, { who: "coach", text: "Tilt it toward me." }] }));
+    expect(u).toContain("Cook: is it drained?");
+    expect(u).toContain("Coach: Tilt it toward me.");
+  });
+
+  it("carries the flow rules: decide, move on when asked, ask to see, don't repeat", () => {
+    const s = cooking.system(ctx());
+    expect(s).toContain("End every answer with [[next]] or [[stay]]");
+    expect(s).toContain("If the cook asks to move on, move on");
+    expect(s).toContain("ask them to show you");
+    expect(s).toContain("Never repeat a tip you already gave");
   });
 });
