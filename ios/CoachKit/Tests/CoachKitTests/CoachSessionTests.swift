@@ -10,6 +10,7 @@ import Testing
   var failConnection = false
   var pending: [(Double, @MainActor () -> Void)] = []
   var now: Double = 0
+  var needs: [CoachSession.FrameNeed] = []
 
   func session(steps: [String] = ["Whisk the flour.", "Add the eggs.", "Rest it."]) -> CoachSession {
     let recipe = CoachRecipe(title: "Pancakes", ingredients: [], steps: steps)
@@ -25,8 +26,9 @@ import Testing
         }
       },
       say: { [unowned self] in self.said.append($0) },
-      frames: { ["F"] },
-      schedule: { [unowned self] secs, fire in self.pending.append((self.now + secs, fire)) })
+      frames: { [unowned self] need in self.needs.append(need); return ["F"] },
+      schedule: { [unowned self] secs, fire in self.pending.append((self.now + secs, fire)) },
+      now: { [unowned self] in Date(timeIntervalSince1970: self.now) })
   }
   func advance(_ secs: Double) {
     now += secs
@@ -67,6 +69,16 @@ import Testing
     #expect(rig.turns[0].stepIndex == 1)
     #expect(rig.turns[0].frames == ["F"])
     #expect(rig.said.suffix(2) == ["Let me see.", "Looks good."])
+  }
+
+  @Test func doneReviewsTheWholeStepAQuestionLooksNow() async {
+    let rig = Rig(); let s = rig.session()
+    rig.now = 100
+    await s.handle(.next)            // step 2 starts at t=100
+    rig.now = 160
+    await s.handle(.done)
+    await s.handle(.question("ok?"))
+    #expect(rig.needs == [.acrossStep(since: Date(timeIntervalSince1970: 100)), .recent])
   }
 
   @Test func aQuestionCarriesTheWordsAsSpoken() async {

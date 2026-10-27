@@ -6,6 +6,8 @@ import Observation
 @MainActor @Observable
 public final class CoachSession {
   public enum Phase: Equatable { case cooking, waiting, finished }
+  /// Which frames a turn needs: "done" reviews the whole step; a question or "I'm back" looks at what's there now.
+  public enum FrameNeed: Equatable { case acrossStep(since: Date), recent }
 
   public let recipe: CoachRecipe
   public let sessionId: String
@@ -15,21 +17,26 @@ public final class CoachSession {
 
   private let send: (TurnRequest) -> AsyncThrowingStream<CoachEvent, Error>
   private let say: (String) -> Void
-  private let frames: () -> [String]
+  private let frames: (FrameNeed) -> [String]
+  private let now: () -> Date
+  /// When the current step began, so "done" can look back across all of it.
+  public private(set) var stepStartedAt: Date
   private let schedule: (Double, @escaping @MainActor () -> Void) -> Void
 
   /// - Parameters:
   ///   - send: one turn to the Worker, as its events arrive — the ack is spoken before the answer exists.
   ///   - say: speak a line.
-  ///   - frames: the frames to show the coach right now.
+  ///   - frames: the frames to show the coach, as base64 JPEG, for what the turn needs.
   ///   - schedule: run a closure after a number of seconds (a timer).
   public init(
     recipe: CoachRecipe, sessionId: String, steps: [LinkedStep],
     send: @escaping (TurnRequest) -> AsyncThrowingStream<CoachEvent, Error>, say: @escaping (String) -> Void,
-    frames: @escaping () -> [String], schedule: @escaping (Double, @escaping @MainActor () -> Void) -> Void
+    frames: @escaping (FrameNeed) -> [String], schedule: @escaping (Double, @escaping @MainActor () -> Void) -> Void,
+    now: @escaping () -> Date = Date.init
   ) {
     self.recipe = recipe; self.sessionId = sessionId; self.steps = steps
     self.send = send; self.say = say; self.frames = frames; self.schedule = schedule
+    self.now = now; self.stepStartedAt = now()
   }
 
   private func speakStep() {
@@ -41,17 +48,17 @@ public final class CoachSession {
     switch intent {
     case .next:
       if stepIndex + 1 >= steps.count { phase = .finished; say("That was the last step. Enjoy it."); return }
-      stepIndex += 1; speakStep()
+      stepIndex += 1; stepStartedAt = now(); speakStep()
     case .previous:
-      stepIndex = max(0, stepIndex - 1); speakStep()
+      stepIndex = max(0, stepIndex - 1); stepStartedAt = now(); speakStep()
     case .repeatStep:
       speakStep()
     case .done:
-      await ask("I've finished this step. Did I miss anything before I move on?")
+      await ask("I've finished this step. Did I miss anything before I move on?", .acrossStep(since: stepStartedAt))
     case .back:
-      await ask("I'm back. How is it looking?")
+      await ask("I'm back. How is it looking?", .recent)
     case .question(let words):
-      await ask(words)
+      await ask(words, .recent)
     case .setTimer(let seconds):
       phase = .waiting
       let label = Self.describe(seconds)
@@ -64,8 +71,8 @@ public final class CoachSession {
     }
   }
 
-  private func ask(_ utterance: String) async {
-    let turn = TurnRequest(sessionId: sessionId, stepIndex: stepIndex, utterance: utterance, frames: frames(), seen: [])
+  private func ask(_ utterance: String, _ need: FrameNeed) async {
+    let turn = TurnRequest(sessionId: sessionId, stepIndex: stepIndex, utterance: utterance, frames: frames(need), seen: [])
     // Text arrives in fragments; it is spoken a whole sentence at a time, and whatever is left when the turn ends.
     var pending = ""
     func flush() {
