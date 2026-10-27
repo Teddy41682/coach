@@ -2,20 +2,22 @@ import CoachKit
 
 /// The demo's built-in dishes: his own boule, and two quick lunches for test cooks.
 enum Recipes {
-  static let all = [quesadilla, eggs, boule]
+  static let all = [tuna, eggs, boule]
 
-  static let quesadilla = CoachRecipe(
-    title: "Cheese Quesadilla",
+  /// His quick lunch, in his steps (2026-10-27).
+  static let tuna = CoachRecipe(
+    title: "Quick Tuna Salad",
     ingredients: [
-      .init(amount: "1", item: "large flour tortilla"), .init(amount: "1 cup", item: "shredded cheese"),
-      .init(amount: "1 tsp", item: "butter"), .init(amount: "to taste", item: "salsa"),
+      .init(amount: "1 can", item: "tuna"), .init(amount: "2 tbsp", item: "mayo"),
+      .init(amount: "2", item: "pickles"), .init(amount: "1 tbsp", item: "pickled onions"),
+      .init(amount: "1 pinch", item: "salt"), .init(amount: "1 pinch", item: "pepper"),
     ],
     steps: [
-      "Heat a pan over medium heat and melt the butter in it.",
-      "Lay the tortilla in the pan and scatter the cheese over one half.",
-      "Fold the tortilla over the cheese and cook until the bottom is golden brown, about 2 minutes.",
-      "Flip it and cook the other side until golden and the cheese has melted, about 2 minutes.",
-      "Slide it onto a board, cut it into wedges and serve with salsa.",
+      "Open the can of tuna, press the lid down and drain off all the water.",
+      "Put the tuna into a bowl.",
+      "Mix in the mayo.",
+      "Chop the pickles and the pickled onions and mix them in.",
+      "Season with salt and pepper and mix it all together.",
     ])
 
   static let eggs = CoachRecipe(
