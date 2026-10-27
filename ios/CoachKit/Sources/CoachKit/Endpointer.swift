@@ -3,7 +3,8 @@ import Foundation
 /// Decides when the cook has finished speaking, from the recogniser's running partial transcript, and ignores the
 /// coach's own voice: anything heard while it talks, or within `echo` after it stops, is dropped.
 public struct Endpointer: Sendable {
-  public var silence: TimeInterval = 0.8
+  /// 0.8 s split "How much… of a pickle" into two questions on his second cook; people pause mid-sentence.
+  public var silence: TimeInterval = 1.1
   public var echo: TimeInterval = 0.3
   private var partial = ""
   private var lastHeard: Date?

@@ -171,10 +171,58 @@ import Testing
     while rig.manual == nil { await Task.yield() }
     rig.manual?.yield(.ack("Let me see."))
     for _ in 0..<5 { await Task.yield() }
-    rig.advance(0.8)
+    rig.advance(1.4)
     rig.manual?.yield(.text("Fine."))
     rig.manual?.yield(.action(.stay)); rig.manual?.yield(.done); rig.manual?.finish()
     await turn.value
-    #expect(rig.said == ["Let me see.", "Fine."])
+    #expect(rig.said.count == 2)
+    #expect(CoachSession.acks.contains(rig.said[0]))
+    #expect(rig.said[1] == "Fine.")
+  }
+
+  /// A slow turn, fed by hand: ack at `ackAt` seconds in, answer after.
+  func slowTurn(_ rig: Rig, _ s: CoachSession, at start: Double) async {
+    rig.now = start
+    rig.useManual = true; rig.manual = nil
+    let turn = Task { await s.handle(.question("ok?")) }
+    while rig.manual == nil { await Task.yield() }
+    rig.manual?.yield(.ack("Let me take a look."))
+    for _ in 0..<5 { await Task.yield() }
+    rig.advance(1.4)
+    rig.manual?.yield(.text("Fine.")); rig.manual?.yield(.action(.stay)); rig.manual?.yield(.done); rig.manual?.finish()
+    await turn.value
+  }
+
+  @Test func acksVaryAndNeverRepeatBackToBack() async {
+    let rig = Rig(); let s = rig.session()
+    await slowTurn(rig, s, at: 0)
+    await slowTurn(rig, s, at: 30)
+    let acks = rig.said.filter { CoachSession.acks.contains($0) }
+    #expect(acks.count == 2)
+    #expect(acks[0] != acks[1])
+  }
+
+  @Test func noAckAgainWithinFifteenSeconds() async {
+    let rig = Rig(); let s = rig.session()
+    await slowTurn(rig, s, at: 0)
+    await slowTurn(rig, s, at: 8)
+    #expect(rig.said.filter { CoachSession.acks.contains($0) }.count == 1)
+  }
+
+  @Test func aStrayLineBreakIsNotSpoken() async {
+    let rig = Rig(); rig.reply = [.text("Looks right.\n"), .action(.stay), .done]
+    let s = rig.session()
+    await s.handle(.question("ok?"))
+    #expect(rig.said == ["Looks right."])
+    #expect(s.history.last == HistoryLine(who: .coach, text: "Looks right."))
+  }
+
+  @Test func theEndIsSaidOnce() async {
+    let rig = Rig(); rig.reply = [.text("All mixed."), .action(.next), .done]
+    let s = rig.session(steps: ["Only step."])
+    await s.handle(.question("done?"))          // the coach's next finishes the recipe
+    await s.handle(.next)                       // the cook asks again
+    await s.handle(.question("bye"))            // and the coach says next again
+    #expect(rig.said.filter { $0 == "That was the last step. Enjoy it." }.count == 1)
   }
 }

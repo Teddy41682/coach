@@ -10,8 +10,8 @@ import Testing
     var e = Endpointer()
     e.heard("is this", at: at(0), coachTalking: false)
     e.heard("is this mixed", at: at(0.5), coachTalking: false)
-    #expect(e.tick(at: at(1.2)) == nil)               // 0.7 s of quiet: not yet
-    #expect(e.tick(at: at(1.3)) == "is this mixed")   // 0.8 s: done
+    #expect(e.tick(at: at(1.5)) == nil)               // 1.0 s of quiet: not yet (people pause mid-sentence)
+    #expect(e.tick(at: at(1.6)) == "is this mixed")   // 1.1 s: done
     #expect(e.tick(at: at(5)) == nil)                 // and only once
   }
 
@@ -27,7 +27,7 @@ import Testing
     e.heard("a look", at: at(10.2), coachTalking: false)     // 200 ms after: the tail of its own voice
     #expect(e.tick(at: at(11.5)) == nil)
     e.heard("what's next", at: at(10.5), coachTalking: false) // 500 ms after: the cook
-    #expect(e.tick(at: at(11.5)) == "what's next")
+    #expect(e.tick(at: at(11.7)) == "what's next")
   }
 
   @Test func blankPartialsAreNotUtterances() {

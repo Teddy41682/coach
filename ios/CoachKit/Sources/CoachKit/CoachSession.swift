@@ -24,9 +24,20 @@ public final class CoachSession {
   /// The conversation so far — the cook's words and the coach's — sent with each turn so the coach builds on it.
   public private(set) var history: [HistoryLine] = []
   static let historyLimit = 12
-  /// How long an answer may take before "let me take a look" is spoken to cover the wait.
-  static let ackDelay = 0.75
+  /// What the coach says while it looks, when an answer is slow. Never the same twice in a row; the Worker's own
+  /// ack text is ignored (it repeated within a step and every answer, his second tuna cook).
+  public static let acks = [
+    "Let me see that.", "One sec.", "Hmm, let's have a look.", "Okay, looking.", "Let me check.",
+    "Give me a second.", "Let's see.", "Okay, one moment.", "Let me look.", "Right, let's see.",
+    "Hang on, looking.", "Just a sec.",
+  ]
+  /// Answers take 1.5–3 s: an ack is only spoken if nothing has started by then…
+  static let ackDelay = 1.3
+  /// …and not again within this long of the last one.
+  static let ackCooldown = 15.0
   private var pendingAck: UUID?
+  private var lastAckAt: Date?
+  private var lastAck = -1
   private let schedule: (Double, @escaping @MainActor () -> Void) -> Void
 
   /// - Parameters:
@@ -52,6 +63,8 @@ public final class CoachSession {
   }
 
   private func advance() {
+    // Once finished, say nothing more about steps: the ending was said three times on his second cook.
+    if phase == .finished { return }
     if stepIndex + 1 >= steps.count { phase = .finished; say("That was the last step. Enjoy it."); return }
     stepIndex += 1; stepStartedAt = now(); speakStep()
   }
@@ -99,7 +112,7 @@ public final class CoachSession {
     var pending = ""
     func speak(_ line: String) { spoken.append(line); say(line) }
     func flush() {
-      let rest = pending.trimmingCharacters(in: .whitespaces)
+      let rest = pending.trimmingCharacters(in: .whitespacesAndNewlines)
       if !rest.isEmpty { speak(rest) }
       pending = ""
     }
@@ -108,13 +121,18 @@ public final class CoachSession {
     do {
       for try await event in send(turn) {
         switch event {
-        case .ack(let line):
+        case .ack:
+          if let last = lastAckAt, now().timeIntervalSince(last) < Self.ackCooldown { break }
           let token = UUID()
           pendingAck = token
           schedule(Self.ackDelay) { [weak self] in
             guard let self, self.pendingAck == token else { return }
             self.pendingAck = nil
-            self.say(line)
+            // Step past the last one by a stride that varies with the step, so the order isn't a loop.
+            let n = Self.acks.count
+            self.lastAck = (self.lastAck + 1 + (self.stepIndex * 5) % (n - 1)) % n
+            self.lastAckAt = self.now()
+            self.say(Self.acks[self.lastAck])
           }
         case .text(let piece):
           cancelAck()
