@@ -7,8 +7,8 @@ const env = { MODEL_API_KEY: "k", COACH_APP_KEY: "app" };
 const H = { "Content-Type": "application/json", "X-Coach-Key": "app", "X-Coach-Device": "dev-1" };
 const recipe = { title: "Pancakes", ingredients: [{ amount: "200 g", item: "flour" }, { amount: "2", item: "eggs" }], steps: ["Whisk the flour.", "Beat in the eggs."] };
 
-function deps(model: ModelConnector) {
-  return { store: new MemorySessionStore(), model: () => model, now: () => 1_000 };
+function deps(model: ModelConnector, purposes: string[] = []) {
+  return { store: new MemorySessionStore(), model: (p: "turn" | "link") => { purposes.push(p); return model; }, now: () => 1_000 };
 }
 const linker: ModelConnector = { async *stream() { yield '{"steps":[["flour"],["eggs"]]}'; } };
 
@@ -49,5 +49,13 @@ describe("POST /v1/turn with sessions", () => {
     await r.text();
     expect(system).toContain("Step 2 of 2: Beat in the eggs.");
     expect(system).toContain("This step uses: eggs");
+  });
+});
+
+describe("model purposes", () => {
+  it("asks for the linking model when a session starts", async () => {
+    const purposes: string[] = [];
+    await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: H, body: JSON.stringify({ recipe }) }), env, deps(linker, purposes));
+    expect(purposes).toEqual(["link"]);
   });
 });

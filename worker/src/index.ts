@@ -14,7 +14,11 @@ export interface Env {
 }
 
 /** What the routes need from the world, so tests can swap the store and the model. */
-export type Deps = { store: SessionStore; model: () => ModelConnector; now: () => number };
+/** `link` answers are long JSON after the model has reasoned, so linking gets a bigger token allowance. */
+export type Purpose = "turn" | "link";
+export type Deps = { store: SessionStore; model: (purpose: Purpose) => ModelConnector; now: () => number };
+/** Measured 2026-10-27: a 7-step, 13-ingredient recipe used 281 reasoning + ~90 answer tokens; 400 truncated it. */
+export const LINK_MAX_TOKENS = 2_000;
 
 /** What one turn may carry. A glasses frame at 720 px and JPEG 0.5 is ~60 KB of base64; these leave headroom. */
 export const MAX_FRAMES = 8;
@@ -93,7 +97,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (!device || device.length > 100) return bad(400, "no_device");
     const recipe = (got.body as { recipe?: unknown } | null)?.recipe;
     if (!isRecipe(recipe)) return bad(400, "bad_recipe");
-    const links = await linkSteps(recipe, deps.model());
+    const links = await linkSteps(recipe, deps.model("link"));
     const id = crypto.randomUUID();
     await deps.store.put({ id, device, recipe, links, createdAt: deps.now() });
     return Response.json({ sessionId: id, steps: recipe.steps.map((text, index) => ({ index, text, ingredients: links[index] ?? [] })) });
@@ -110,7 +114,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
       recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
       stepIngredients: session.links[Math.min(turn.stepIndex, Math.max(session.links.length - 1, 0))] ?? [],
     };
-    return new Response(runTurn(turn, deps.model(), { system: cooking.system(ctx), user: cooking.user(ctx) }), {
+    return new Response(runTurn(turn, deps.model("turn"), { system: cooking.system(ctx), user: cooking.user(ctx) }), {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
     });
   }
@@ -122,7 +126,9 @@ export default {
   fetch(request: Request, env: Env): Promise<Response> {
     return handle(request, env, {
       store: new D1SessionStore(env.DB as D1Database),
-      model: () => new MuseConnector(env.MODEL_API_KEY),
+      model: (purpose) => purpose === "link"
+        ? new MuseConnector(env.MODEL_API_KEY, "muse-spark-1.3", "minimal", undefined, LINK_MAX_TOKENS)
+        : new MuseConnector(env.MODEL_API_KEY),
       now: () => Date.now(),
     });
   },

@@ -28,10 +28,15 @@ export async function linkSteps(recipe: CoachRecipe, model: ModelConnector): Pro
     for await (const piece of model.stream({ system: SYSTEM, user, images: [] }, new AbortController().signal)) text += piece;
     const json = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
     const steps = (JSON.parse(json) as { steps?: unknown }).steps;
-    if (!Array.isArray(steps) || steps.length !== recipe.steps.length) return everything(recipe);
+    if (!Array.isArray(steps) || steps.length !== recipe.steps.length) {
+      console.warn("linkSteps fell back: wrong step count", Array.isArray(steps) ? steps.length : typeof steps, recipe.steps.length);
+      return everything(recipe);
+    }
     const known = new Set(recipe.ingredients.map((i) => i.item));
     return steps.map((s) => (Array.isArray(s) ? s.filter((x): x is string => typeof x === "string" && known.has(x)) : []));
-  } catch {
+  } catch (error) {
+    // The fallback keeps cooking working, but it must be visible: a silent fallback hid a truncation bug once.
+    console.warn("linkSteps fell back:", error instanceof Error ? error.message : String(error));
     return everything(recipe);
   }
 }
