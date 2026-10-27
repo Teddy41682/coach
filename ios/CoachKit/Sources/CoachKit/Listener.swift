@@ -5,6 +5,16 @@ import Speech
 /// Hands-free listening: the glasses' (or phone's) microphone → on-device speech recognition → finished
 /// utterances, via the Endpointer. The coach's own voice is ignored, and the transcript starts afresh each time the
 /// coach falls quiet or an utterance is taken, so its words never linger in what the cook "said".
+/// The recognition request the audio thread appends to. Swapped on the main actor, read on the audio thread.
+private final class RequestBox: @unchecked Sendable {
+  private let lock = NSLock()
+  private var value: SFSpeechAudioBufferRecognitionRequest?
+  var request: SFSpeechAudioBufferRecognitionRequest? {
+    get { lock.withLock { value } }
+    set { lock.withLock { value = newValue } }
+  }
+}
+
 @MainActor
 public final class Listener {
   public let utterances: AsyncStream<String>
@@ -12,7 +22,11 @@ public final class Listener {
   private let speaker: Speaker
   private let engine = AVAudioEngine()
   private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-  private var request: SFSpeechAudioBufferRecognitionRequest?
+  private let box = RequestBox()
+  private var request: SFSpeechAudioBufferRecognitionRequest? {
+    get { box.request }
+    set { box.request = newValue }
+  }
   private var task: SFSpeechRecognitionTask?
   private var endpointer = Endpointer()
   private var ticker: Timer?
@@ -25,8 +39,7 @@ public final class Listener {
   public enum Failure: Error { case noSpeechPermission, noMicPermission, noRecognizer }
 
   public func start() async throws {
-    let speech = await withCheckedContinuation { c in SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) } }
-    guard speech == .authorized else { throw Failure.noSpeechPermission }
+    guard await Self.speechAuthorization() == .authorized else { throw Failure.noSpeechPermission }
     guard await AVAudioApplication.requestRecordPermission() else { throw Failure.noMicPermission }
     guard recognizer?.isAvailable == true else { throw Failure.noRecognizer }
 
@@ -35,10 +48,7 @@ public final class Listener {
     try audio.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .defaultToSpeaker])
     try audio.setActive(true)
 
-    let input = engine.inputNode
-    input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
-      self?.request?.append(buffer)
-    }
+    Self.tap(engine.inputNode, into: box)
     engine.prepare()
     try engine.start()
 
@@ -67,14 +77,28 @@ public final class Listener {
     r.shouldReportPartialResults = true
     if recognizer?.supportsOnDeviceRecognition == true { r.requiresOnDeviceRecognition = true }
     request = r
-    task = recognizer?.recognitionTask(with: r) { [weak self] result, error in
+    let mine = ObjectIdentifier(r)   // which task this callback belongs to; stale tasks' callbacks are dropped
+    task = recognizer?.recognitionTask(with: r) { @Sendable [weak self] result, error in
       let text = result?.bestTranscription.formattedString
       let ended = error != nil || result?.isFinal == true
       Task { @MainActor in
-        guard let self, self.request === r else { return }
+        guard let self, let current = self.request, ObjectIdentifier(current) == mine else { return }
         if let text { self.endpointer.heard(text, at: Date(), coachTalking: self.speaker.isSpeaking) }
         if ended { self.restart() }
       }
+    }
+  }
+
+  // Apple calls these back on its own threads. Closures written inside this @MainActor class would be inferred
+  // main-actor-isolated and Swift 6 traps when they run elsewhere (it crashed on his phone at the permission
+  // reply), so they are built in nonisolated helpers or marked @Sendable.
+  nonisolated private static func speechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+    await withCheckedContinuation { c in SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) } }
+  }
+
+  nonisolated private static func tap(_ input: AVAudioInputNode, into box: RequestBox) {
+    input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
+      box.request?.append(buffer)
     }
   }
 

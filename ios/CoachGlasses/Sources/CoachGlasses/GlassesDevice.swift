@@ -73,16 +73,17 @@ public final class GlassesDevice: CoachDevice {
       status = .disconnected("The glasses' camera couldn't start."); return
     }
     self.camera = camera
-    camera.stream.videoFramePublisher.listen { [weak self] frame in
-      // Off the main thread: encode here, hand only the JPEG over.
+    camera.stream.videoFramePublisher.listen { @Sendable [weak self] frame in
+      // The toolkit calls back on its own threads, so these closures are @Sendable (not main-actor): encode here,
+      // hand only the JPEG over.
       guard let jpeg = frame.makeUIImage()?.jpegData(compressionQuality: 0.5) else { return }
       let now = Date()
       Task { @MainActor in self?.buffer.push(jpeg, at: now) }
     }.store(in: tokens)
-    camera.stream.statePublisher.listen { [weak self] state in
+    camera.stream.statePublisher.listen { @Sendable [weak self] state in
       Task { @MainActor in self?.streamChanged(state) }
     }.store(in: tokens)
-    camera.stream.errorPublisher.listen { [weak self] error in
+    camera.stream.errorPublisher.listen { @Sendable [weak self] error in
       Task { @MainActor in self?.status = .paused(error.localizedDescription) }
     }.store(in: tokens)
     camera.stream.start()
