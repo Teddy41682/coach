@@ -53,6 +53,14 @@ describe("MuseConnector", () => {
     for await (const t of new MuseConnector("KEY").stream({ system: "", user: "", images: [] }, new AbortController().signal)) out.push(t);
     expect(out).toEqual(["ok"]);
   });
+
+
+  it("gives turn answers room to think and still finish (400 cut answers mid-word, 2026-10-27)", async () => {
+    let body: Record<string, unknown> = {};
+    const fetchImpl = (async (_u: string, i: RequestInit) => { body = JSON.parse(i.body as string); return new Response(sseBody(["data: [DONE]\n\n"])); }) as unknown as typeof fetch;
+    for await (const _ of new MuseConnector("KEY", "muse-spark-1.3", "minimal", fetchImpl).stream({ system: "", user: "", images: [] }, new AbortController().signal)) { /* drain */ }
+    expect(body.max_completion_tokens).toBe(1_200);
+  });
 });
 
 afterEach(() => vi.unstubAllGlobals());

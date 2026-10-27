@@ -32,7 +32,7 @@ describe("the cooking pack", () => {
     expect(s).toContain("Never give nutrition, calorie, health or medical advice");
     expect(s).toContain("suggest a thermometer");
     expect(s).toContain("offer it as a tip, never as a change to the recipe");
-    expect(s).toContain("at most two short sentences");
+    expect(s).toContain("Usually one short sentence");
   });
 
   it("puts the question and what's been seen in the user turn", () => {
@@ -78,6 +78,8 @@ describe("the cooking pack", () => {
     expect(s).toContain("ask them to show you");
     expect(s).toContain("Never repeat a tip you already gave");
     expect(s).toContain("don't say what the next step is");
+    expect(s).toContain("Only add a tip when it really helps");
+    expect(s).toContain("Vary your words");
   });
 
   it("judges against the step's briefing", () => {

@@ -14,7 +14,8 @@ export class MuseConnector implements ModelConnector {
     private readonly effort = "minimal",
     // Wrapped, not passed bare: Workers throws "Illegal invocation" when fetch is called through a reference.
     private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init),
-    private readonly maxTokens = 400,
+    // Room for the reasoning and a whole answer: at 400, reasoning ate the allowance and answers stopped mid-word.
+    private readonly maxTokens = 1_200,
   ) {
     if (model.includes("contributor")) throw new Error(`${model}: Coach uses the standard tier only`);
   }
