@@ -17,6 +17,7 @@ struct CoachDemoApp: App {
 /// Glasses or phone, then cook the bundled recipe (his own gluten-free boule).
 struct PickView: View {
   @State private var runner: CoachRunner?
+  @State private var record = true
 
   private func begin(_ device: CoachDevice) {
     let info = Bundle.main.infoDictionary ?? [:]
@@ -24,7 +25,7 @@ struct PickView: View {
       base: URL(string: info["CoachWorkerURL"] as? String ?? "")!,
       appKey: info["CoachAppKey"] as? String ?? "",
       device: UIDevice.current.identifierForVendor?.uuidString ?? "unknown")
-    runner = CoachRunner(recipe: Recipes.boule, device: device, client: client)
+    runner = CoachRunner(recipe: Recipes.boule, device: device, client: client, recorder: record ? try? SessionRecorder() : nil)
   }
 
   var body: some View {
@@ -33,8 +34,10 @@ struct PickView: View {
     } else {
       VStack(spacing: 16) {
         Text(Recipes.boule.title).font(.title.weight(.semibold))
-        Button("Cook with my glasses") { begin(GlassesDevice()) }.buttonStyle(.borderedProminent)
-        Button("Cook with the phone camera") { begin(PhoneDevice()) }.buttonStyle(.bordered)
+        Toggle("Record this session", isOn: $record).fixedSize()
+        // Recording streams at 15 fps for smooth video; the coach still looks at 2 a second either way.
+        Button("Cook with my glasses") { begin(GlassesDevice(fps: record ? 15 : 2)) }.buttonStyle(.borderedProminent)
+        Button("Cook with the phone camera") { begin(PhoneDevice(fps: record ? 15 : 2)) }.buttonStyle(.bordered)
       }
       .padding()
     }

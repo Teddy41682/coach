@@ -11,12 +11,14 @@ import UIKit
 public final class GlassesDevice: CoachDevice {
   public private(set) var status: DeviceStatus = .starting
   private var buffer = FrameBuffer(capacity: 120)
+  private var thin = Thinner(every: 0.5)
+  public var onFrame: (@MainActor (Data, Date) -> Void)?
   private let fps: UInt
   private var session: DeviceSession?
   private var camera: Camera?
   private var tokens = ListenerTokenBag()
 
-  /// `fps` must be one the toolkit accepts: 2, 7, 15, 24 or 30.
+  /// `fps` must be one the toolkit accepts: 2, 7, 15, 24 or 30. 2 for coaching alone; 15 when recording.
   public init(fps: UInt = 2) { self.fps = fps }
 
   public enum Failure: LocalizedError {
@@ -78,7 +80,7 @@ public final class GlassesDevice: CoachDevice {
       // hand only the JPEG over.
       guard let jpeg = frame.makeUIImage()?.jpegData(compressionQuality: 0.5) else { return }
       let now = Date()
-      Task { @MainActor in self?.buffer.push(jpeg, at: now) }
+      Task { @MainActor in self?.arrived(jpeg, at: now) }
     }.store(in: tokens)
     camera.stream.statePublisher.listen { @Sendable [weak self] state in
       Task { @MainActor in self?.streamChanged(state) }
@@ -98,6 +100,12 @@ public final class GlassesDevice: CoachDevice {
 
   public func recent(_ n: Int) -> [Data] { buffer.last(n) }
   public func across(since date: Date, max: Int) -> [Data] { buffer.sampled(since: date, max: max) }
+
+  /// Every frame to the recorder; the coach's buffer keeps 2 a second whatever the stream rate.
+  private func arrived(_ jpeg: Data, at date: Date) {
+    onFrame?(jpeg, date)
+    if thin.keep(at: date) { buffer.push(jpeg, at: date) }
+  }
 
   private func sessionChanged(_ state: DeviceSessionState) {
     switch state {

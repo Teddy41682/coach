@@ -43,4 +43,6 @@ public protocol CoachDevice: AnyObject {
   func recent(_ n: Int) -> [Data]
   /// Frames spread across everything since `date` (the start of the step).
   func across(since date: Date, max: Int) -> [Data]
+  /// Every frame as it arrives (on the main actor) — the recorder's feed. The coach's own buffer is thinned to 2 a second.
+  var onFrame: (@MainActor (Data, Date) -> Void)? { get set }
 }

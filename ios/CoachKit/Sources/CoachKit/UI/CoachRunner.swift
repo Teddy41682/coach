@@ -24,19 +24,24 @@ public final class CoachRunner {
   private var session: CoachSession?
   private var heardAt: Date?
   private var watcher: Task<Void, Never>?
+  private var lastLoggedStep = 0
+  /// Set when this session is being recorded.
+  public let recorder: SessionRecorder?
 
-  public init(recipe: CoachRecipe, device: CoachDevice, client: CoachClient) {
-    self.recipe = recipe; self.device = device; self.client = client
+  public init(recipe: CoachRecipe, device: CoachDevice, client: CoachClient, recorder: SessionRecorder? = nil) {
+    self.recipe = recipe; self.device = device; self.client = client; self.recorder = recorder
   }
 
   private func say(_ line: String) {
     if let t = heardAt { lastResponse = Date().timeIntervalSince(t); heardAt = nil }
     activity = .speaking
+    recorder?.note(.said(line))
     speaker.say(line)
   }
 
   public func start() async {
     do {
+      if let recorder { device.onFrame = { recorder.frame($0, at: $1) }; recorder.note(.note("start: \(recipe.title)")) }
       try await device.start()
       let (sessionId, steps) = try await client.start(recipe)
       let session = CoachSession(
@@ -55,12 +60,14 @@ public final class CoachRunner {
       self.session = session
       let listener = Listener(speaker: speaker)
       self.listener = listener
+      listener.record(into: recorder?.mic)
       try await listener.start()
       say("Let's make \(recipe.title). Step 1: \(steps.first?.text ?? "")")
       refresh()
       watchDevice()
       for await words in listener.utterances {
         lastHeard = words
+        recorder?.note(.heard(words))
         heardAt = Date()
         activity = .thinking
         await session.handle(parseIntent(words))
@@ -69,6 +76,7 @@ public final class CoachRunner {
       }
     } catch {
       activity = .stopped("Couldn't start: \(error.localizedDescription)")
+      recorder?.note(.note("failed: \(error.localizedDescription)"))
     }
   }
 
@@ -77,6 +85,8 @@ public final class CoachRunner {
     listener?.stop()
     speaker.stop()
     device.stop()
+    recorder?.note(.note("stop"))
+    recorder?.finish()
     activity = .stopped("Stopped.")
   }
 
@@ -84,6 +94,7 @@ public final class CoachRunner {
     guard let s = session else { return }
     stepNumber = s.stepIndex + 1
     stepText = s.steps.indices.contains(s.stepIndex) ? s.steps[s.stepIndex].text : ""
+    if stepNumber != lastLoggedStep { recorder?.note(.step(stepNumber, stepText)); lastLoggedStep = stepNumber }
   }
 
   /// Says it out loud when the glasses fold, pause or drop, and when they're back.
@@ -96,7 +107,8 @@ public final class CoachRunner {
         let now = self.device.status
         if now != last {
           switch now {
-          case .paused(let why), .disconnected(let why): self.deviceNote = why; self.say(why)
+          case .paused(let why), .disconnected(let why):
+            self.deviceNote = why; self.recorder?.note(.note("device: \(why)")); self.say(why)
           case .ready: if last != .starting { self.deviceNote = ""; self.say("I can see again.") }
           case .starting: break
           }

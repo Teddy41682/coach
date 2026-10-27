@@ -18,7 +18,11 @@ public struct CoachView: View {
 
   public var body: some View {
     VStack(alignment: .leading, spacing: 20) {
-      Text(label).font(.headline).foregroundStyle(.secondary)
+      HStack {
+        Text(label).font(.headline).foregroundStyle(.secondary)
+        Spacer()
+        if runner.recorder != nil { Label("REC", systemImage: "record.circle.fill").font(.caption.weight(.bold)).foregroundStyle(.red) }
+      }
       if runner.stepNumber > 0 {
         Text("Step \(runner.stepNumber)").font(.caption.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
         Text(runner.stepText).font(.title2)

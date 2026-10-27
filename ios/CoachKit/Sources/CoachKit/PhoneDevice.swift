@@ -9,6 +9,8 @@ import UIKit
 public final class PhoneDevice: NSObject, CoachDevice {
   public private(set) var status: DeviceStatus = .starting
   private var buffer = FrameBuffer(capacity: 120)
+  private var thin = Thinner(every: 0.5)
+  public var onFrame: (@MainActor (Data, Date) -> Void)?
   private let session = AVCaptureSession()
   private let queue = DispatchQueue(label: "coach.phone.frames")
   private let fps: Double
@@ -52,7 +54,10 @@ public final class PhoneDevice: NSObject, CoachDevice {
   public func recent(_ n: Int) -> [Data] { buffer.last(n) }
   public func across(since date: Date, max: Int) -> [Data] { buffer.sampled(since: date, max: max) }
 
-  fileprivate func keep(_ jpeg: Data, at date: Date) { buffer.push(jpeg, at: date) }
+  fileprivate func keep(_ jpeg: Data, at date: Date) {
+    onFrame?(jpeg, date)
+    if thin.keep(at: date) { buffer.push(jpeg, at: date) }
+  }
 }
 
 extension PhoneDevice: AVCaptureVideoDataOutputSampleBufferDelegate {

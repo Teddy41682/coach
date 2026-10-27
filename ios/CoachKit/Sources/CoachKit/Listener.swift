@@ -9,6 +9,11 @@ import Speech
 private final class RequestBox: @unchecked Sendable {
   private let lock = NSLock()
   private var value: SFSpeechAudioBufferRecognitionRequest?
+  private var mic: MicFile?
+  var recording: MicFile? {
+    get { lock.withLock { mic } }
+    set { lock.withLock { mic = newValue } }
+  }
   var request: SFSpeechAudioBufferRecognitionRequest? {
     get { lock.withLock { value } }
     set { lock.withLock { value = newValue } }
@@ -30,6 +35,9 @@ public final class Listener {
   private var task: SFSpeechRecognitionTask?
   private var endpointer = Endpointer()
   private var ticker: Timer?
+
+  /// While set, the microphone is also written to the recording.
+  func record(into mic: MicFile?) { box.recording = mic }
 
   public init(speaker: Speaker) {
     self.speaker = speaker
@@ -99,6 +107,7 @@ public final class Listener {
   nonisolated private static func tap(_ input: AVAudioInputNode, into box: RequestBox) {
     input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
       box.request?.append(buffer)
+      box.recording?.write(buffer)
     }
   }
 

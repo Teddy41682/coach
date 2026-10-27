@@ -12,10 +12,14 @@ public final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
   /// Called when the coach falls quiet, so the listener can start a clean transcript.
   public var onQuiet: (() -> Void)?
 
-  public override init() {
-    // The best installed English voice: premium or enhanced if the phone has one.
+  /// The best installed English voice: premium or enhanced if the phone has one. Shared with the recorder.
+  public static let chosenVoice: AVSpeechSynthesisVoice? = {
     let english = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en-") }
-    voice = english.max { $0.quality.rawValue < $1.quality.rawValue } ?? AVSpeechSynthesisVoice(language: "en-US")
+    return english.max { $0.quality.rawValue < $1.quality.rawValue } ?? AVSpeechSynthesisVoice(language: "en-US")
+  }()
+
+  public override init() {
+    voice = Self.chosenVoice
     super.init()
     synth.delegate = self
   }

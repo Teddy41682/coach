@@ -4,6 +4,8 @@
 <dict>
   <key>CFBundleDisplayName</key><string>Coach</string>
   <key>UILaunchScreen</key><dict/>
+  <key>UIFileSharingEnabled</key><true/>
+  <key>LSSupportsOpeningDocumentsInPlace</key><true/>
   <key>CoachAppKey</key><string>$(COACH_APP_KEY)</string>
   <key>CoachWorkerURL</key><string>https://coach.teddy41682.workers.dev</string>
   <key>CFBundleURLTypes</key>
