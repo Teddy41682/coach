@@ -28,6 +28,9 @@ import Testing
     #expect([Intent.setTimer(seconds: 1200), .setTimer(seconds: 300)].contains(parseIntent(s)))
   }
 
+  @Test(arguments: ["OK", "okay", "um", "OK OK", "  "])
+  func fillerAloneIsIgnored(_ s: String) { #expect(parseIntent(s) == .ignore) }
+
   @Test func question() {
     #expect(parseIntent("Is this mixed enough?") == .question("Is this mixed enough?"))
   }

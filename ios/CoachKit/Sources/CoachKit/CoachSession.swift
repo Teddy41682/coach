@@ -59,6 +59,8 @@ public final class CoachSession {
       await ask("I'm back. How is it looking?", .recent)
     case .question(let words):
       await ask(words, .recent)
+    case .ignore:
+      return
     case .setTimer(let seconds):
       phase = .waiting
       let label = Self.describe(seconds)

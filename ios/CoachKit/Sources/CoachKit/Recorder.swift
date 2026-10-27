@@ -30,6 +30,9 @@ public final class SessionRecorder {
   private let writes = DispatchQueue(label: "coach.recorder")
   private let renderer = AVSpeechSynthesizer()
   let mic: MicFile
+  /// After `finish()`, late arrivals are dropped: writing to the closed events file raised an exception and
+  /// killed the app on Stop (his phone, 2026-10-27).
+  private var finished = false
 
   public init(now: Date = Date()) throws {
     let stamp = ISO8601DateFormatter().string(from: now).replacingOccurrences(of: ":", with: "-")
@@ -45,12 +48,14 @@ public final class SessionRecorder {
   }
 
   public func note(_ e: RecordingLog.Event, at date: Date = Date()) {
+    guard !finished else { return }
     let line = log.add(e, at: date) + "\n"
     events?.write(Data(line.utf8))
     if case .said(let text) = e { render(text, at: date) }
   }
 
   public func frame(_ jpeg: Data, at date: Date) {
+    guard !finished else { return }
     let url = folder.appending(path: "frames/" + RecordingLog.frameName(at: date.timeIntervalSince(log.start)))
     writes.async { try? jpeg.write(to: url) }
   }
@@ -73,6 +78,8 @@ public final class SessionRecorder {
   }
 
   public func finish() {
+    guard !finished else { return }
+    finished = true
     mic.close()
     try? events?.close()
   }

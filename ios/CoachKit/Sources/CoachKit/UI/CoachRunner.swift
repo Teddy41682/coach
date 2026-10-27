@@ -32,7 +32,10 @@ public final class CoachRunner {
     self.recipe = recipe; self.device = device; self.client = client; self.recorder = recorder
   }
 
+  private var stopped = false
+
   private func say(_ line: String) {
+    guard !stopped else { return }
     if let t = heardAt { lastResponse = Date().timeIntervalSince(t); heardAt = nil }
     activity = .speaking
     recorder?.note(.said(line))
@@ -81,6 +84,8 @@ public final class CoachRunner {
   }
 
   public func stop() {
+    guard !stopped else { return }
+    stopped = true
     watcher?.cancel()
     listener?.stop()
     speaker.stop()
@@ -103,7 +108,7 @@ public final class CoachRunner {
       var last: DeviceStatus = .ready
       while !Task.isCancelled {
         try? await Task.sleep(for: .seconds(1))
-        guard let self else { return }
+        guard !Task.isCancelled, let self else { return }
         let now = self.device.status
         if now != last {
           switch now {

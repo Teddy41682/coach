@@ -5,6 +5,8 @@ public enum Intent: Equatable, Sendable {
   case next, previous, repeatStep, done, back
   case setTimer(seconds: Int)
   case question(String)
+  /// Filler on its own ("OK", "um"): nothing to answer.
+  case ignore
 }
 
 private let units = ["one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
@@ -50,6 +52,7 @@ public func parseIntent(_ utterance: String) -> Intent {
     .joined()
   let words = cleaned.split(separator: " ").map(String.init).filter { !["ok", "okay", "so", "um", "please"].contains($0) }
   let phrase = words.joined(separator: " ")
+  if words.isEmpty { return .ignore }
 
   if let seconds = timer(words) { return .setTimer(seconds: seconds) }
   if ["i'm back", "im back", "i am back", "back now", "i'm back now"].contains(phrase) { return .back }
