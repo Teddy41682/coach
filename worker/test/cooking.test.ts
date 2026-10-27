@@ -77,6 +77,7 @@ describe("the cooking pack", () => {
     expect(s).toContain("If the cook asks to move on, move on");
     expect(s).toContain("ask them to show you");
     expect(s).toContain("Never repeat a tip you already gave");
+    expect(s).toContain("don't say what the next step is");
   });
 
   it("judges against the step's briefing", () => {

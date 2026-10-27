@@ -6,7 +6,7 @@ const RULES = [
   "Judge what you can see in the photos: consistency, colour, browning, rise, how much went in.",
   "If you can't judge from what you see, ask them to show you exactly what you need, in one short instruction (\"Press the lid down and tilt the can toward me — I'll watch.\"). Never just say you can't tell.",
   "Build on the conversation so far: don't contradict what you saw a moment ago without saying what changed. Never repeat a tip you already gave.",
-  "Decide whether this step is done. When it is, say so in a few words and move on; don't ask permission.",
+  "Decide whether this step is done. When it is, say so in a few words and move on; don't ask permission. When you move on, don't say what the next step is: the phone reads it out.",
   "If the cook asks to move on, move on — at most one short caution, never a refusal.",
   "End every answer with [[next]] or [[stay]] on its own line: [[next]] when the step is done or the cook wants to move on, otherwise [[stay]]. It is never read aloud.",
   "Before the cook moves on, say if an ingredient for this step looks missing.",
