@@ -44,7 +44,7 @@ public struct TurnRequest: Codable, Sendable, Equatable {
 }
 
 /// The coach's call on the current step, sent after its answer.
-public enum Decision: String, Sendable { case next, stay }
+public enum Decision: String, Sendable { case next, stay, hold }
 
 /// What `/v1/turn` streams back, in order: maybe an ack, text pieces, then done or an error.
 public enum CoachEvent: Sendable, Equatable {
@@ -83,5 +83,43 @@ public struct ObserveResult: Codable, Sendable, Equatable {
   public let usage: ObserveUsage
   public init(events: [String], interject: String?, away: Bool, usage: ObserveUsage) {
     self.events = events; self.interject = interject; self.away = away; self.usage = usage
+  }
+}
+
+/// The mind's call on the step: keep going, move on, or hold the place while the cook is away.
+public enum StepCall: String, Codable, Sendable {
+  case stay, next, hold
+  public init(from decoder: Decoder) throws {
+    self = StepCall(rawValue: (try? decoder.singleValueContainer().decode(String.self)) ?? "") ?? .stay
+  }
+}
+
+/// What `/v1/mind` takes: one wake of the mind, with everything a person beside the cook would know.
+public struct MindRequest: Codable, Sendable, Equatable {
+  public let sessionId: String
+  public let stepIndex: Int
+  public let wake: WakeReason
+  /// The newest timeline lines ("1:05 cook: is it done?"), at most 50.
+  public let timeline: [String]
+  /// Seconds since anyone last spoke.
+  public let quietFor: Double
+  public var held: Bool = false
+  public var finished: Bool = false
+  /// Eye wakes: the newest frame and the previous one the mind looked at (base64 JPEG ≤ 640 px).
+  public var frame: String? = nil
+  public var previous: String? = nil
+  /// Spoken wakes: the cook's words and the frames to judge them by.
+  public var utterance: String? = nil
+  public var frames: [String]? = nil
+}
+
+/// One eye wake's answer: what it newly saw, a line to say now (most often none), and its call on the step.
+public struct MindAnswer: Codable, Sendable, Equatable {
+  public let seen: [String]
+  public let say: String?
+  public let step: StepCall
+  public let usage: ObserveUsage
+  public init(seen: [String], say: String?, step: StepCall, usage: ObserveUsage) {
+    self.seen = seen; self.say = say; self.step = step; self.usage = usage
   }
 }
