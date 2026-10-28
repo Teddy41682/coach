@@ -12,7 +12,17 @@ public final class Observer {
 
   static let cadence = 2.5
   static let awayCadence = 30.0
+  /// On glasses the camera is wherever the cook looks, so a glance isn't leaving: away needs at least this many away
+  /// looks spanning at least `awayFor` seconds (his first try, 2026-10-27: 3 looks / 7 s said "stepped away" three
+  /// times in 35 s while he was talking to it)…
   static let awayAfter = 3
+  static let awayFor = 60.0
+  /// …never within this long of the cook speaking (talking means they're here)…
+  static let spokeGrace = 120.0
+  /// …the "stepped away" line at most once in this long (after that the place is held quietly)…
+  static let awayLineSpacing = 300.0
+  /// …and back takes two looks in a row at the cooking.
+  static let backAfter = 2
   static let interjectSpacing = 20.0
 
   public private(set) var log: ObservationLog
@@ -33,6 +43,10 @@ public final class Observer {
   private var lastInterjectAt: Date?
   private var previous: String?
   private var awayStreak = 0
+  private var awaySince: Date?
+  private var backStreak = 0
+  private var lastSpokeAt: Date?
+  private var lastAwayLineAt: Date?
 
   /// - Parameters:
   ///   - observe: one look at the Worker.
@@ -61,16 +75,28 @@ public final class Observer {
     log.append(r.events, at: now(), step: step)
     onLook?(r)
 
+    let t = now()
     if r.away {
+      backStreak = 0
       awayStreak += 1
-      if presence == .present && awayStreak >= Self.awayAfter {
+      if awaySince == nil { awaySince = t }
+      let spokeRecently = lastSpokeAt.map { t.timeIntervalSince($0) < Self.spokeGrace } ?? false
+      if presence == .present, awayStreak >= Self.awayAfter, !spokeRecently,
+         let since = awaySince, t.timeIntervalSince(since) >= Self.awayFor {
         presence = .away
+        if let said = lastAwayLineAt, t.timeIntervalSince(said) < Self.awayLineSpacing { return nil }
+        lastAwayLineAt = t
         return .away("Looks like you've stepped away. I'll hold our place at step \(step + 1) — come back when you're ready.")
       }
       return nil
     }
-    awayStreak = 0
-    if presence == .away { presence = .present; return .back(recap(step)) }
+    awayStreak = 0; awaySince = nil
+    if presence == .away {
+      backStreak += 1
+      if backStreak < Self.backAfter { return nil }
+      presence = .present; backStreak = 0
+      return .back(recap(step))
+    }
 
     guard let line = r.interject else { return nil }
     let state = current()
@@ -80,10 +106,11 @@ public final class Observer {
     return .interject(line)
   }
 
-  /// The cook spoke: if they'd stepped away, they're back — here's where we were.
+  /// The cook spoke (call on every utterance): they're here. If they'd stepped away, here's where we were.
   public func returned(step: Int) -> String? {
+    lastSpokeAt = now(); awayStreak = 0; awaySince = nil
     guard presence == .away else { return nil }
-    presence = .present; awayStreak = 0; lastLookAt = nil
+    presence = .present; backStreak = 0; lastLookAt = nil
     return recap(step)
   }
 

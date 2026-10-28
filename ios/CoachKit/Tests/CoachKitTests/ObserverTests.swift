@@ -154,34 +154,73 @@ import Testing
     rig.now = 20; #expect(await o.tick(step: 0, paused: false, current: idle) != nil)
   }
 
-  @Test func holdsThePlaceAfterThreeAwayLooksAndSaysSoOnce() async {
+  /// Away looks at each of these times (seconds), then whatever follows.
+  func awayAt(_ rig: ObserverRig, _ o: Observer, _ times: [Double]) async -> [Observer.Output?] {
+    var out: [Observer.Output?] = []
+    for t in times { rig.now = t; rig.answers.append(ObserverRig.result(away: true)); out.append(await o.tick(step: 0, paused: false, current: idle)) }
+    return out
+  }
+
+  @Test func aFewAwayLooksAreJustAGlanceNotLeaving() async {
     let rig = ObserverRig(); let o = rig.observer()
-    rig.answers = (0..<4).map { _ in ObserverRig.result(away: true) }
-    #expect(await o.tick(step: 0, paused: false, current: idle) == nil)
-    rig.now = 3; #expect(await o.tick(step: 0, paused: false, current: idle) == nil)
-    rig.now = 6
-    #expect(await o.tick(step: 0, paused: false, current: idle)
-      == .away("Looks like you've stepped away. I'll hold our place at step 1 — come back when you're ready."))
+    let out = await awayAt(rig, o, [0, 3, 6, 9, 20, 40])
+    #expect(out.allSatisfy { $0 == nil })
+    #expect(o.presence == .present)
+  }
+
+  @Test func holdsThePlaceAfterAMinuteAwayAndSaysSoOnce() async {
+    let rig = ObserverRig(); let o = rig.observer()
+    let out = await awayAt(rig, o, [0, 20, 40, 60])
+    #expect(out.last == .away("Looks like you've stepped away. I'll hold our place at step 1 — come back when you're ready."))
     #expect(o.presence == .away)
-    rig.now = 40; #expect(await o.tick(step: 0, paused: false, current: idle) == nil)
+    #expect(await awayAt(rig, o, [100, 140]).allSatisfy { $0 == nil })
+  }
+
+  @Test func talkingMeansTheyreHere() async {
+    let rig = ObserverRig(); let o = rig.observer()
+    _ = await awayAt(rig, o, [0, 20, 40])
+    rig.now = 50; _ = o.returned(step: 0)
+    // Away looks for the next two minutes say nothing: they just spoke.
+    #expect(await awayAt(rig, o, [60, 90, 120, 150, 169]).allSatisfy { $0 == nil })
+    #expect(o.presence == .present)
+  }
+
+  @Test func neverSaysSteppedAwayTwiceWithinFiveMinutes() async {
+    let rig = ObserverRig(); let o = rig.observer()
+    _ = await awayAt(rig, o, [0, 20, 40, 60])
+    for t in [90.0, 120] { rig.now = t; rig.answers.append(ObserverRig.result()); _ = await o.tick(step: 0, paused: false, current: idle) }
+    #expect(o.presence == .present)
+    let again = await awayAt(rig, o, [130, 150, 170, 190, 250])
+    #expect(again.allSatisfy { $0 == nil })
+    #expect(o.presence == .away)   // the place is still held, just quietly
+  }
+
+  @Test func oneLookAtTheCookingIsntEnoughToBeBack() async {
+    let rig = ObserverRig(); let o = rig.observer()
+    _ = await awayAt(rig, o, [0, 20, 40, 60])
+    rig.now = 100; rig.answers.append(ObserverRig.result())
+    #expect(await o.tick(step: 0, paused: false, current: idle) == nil)
+    #expect(o.presence == .away)
   }
 
   @Test func whileAwayItGlancesOnlyEveryThirtySecondsAndNeverInterjects() async {
     let rig = ObserverRig(); let o = rig.observer()
-    rig.answers = (0..<3).map { _ in ObserverRig.result(away: true) } + [ObserverRig.result(interject: "Cold pan.", away: true)]
-    for t in [0.0, 3, 6] { rig.now = t; _ = await o.tick(step: 0, paused: false, current: idle) }
-    rig.now = 20; _ = await o.tick(step: 0, paused: false, current: idle)
-    #expect(rig.sent.count == 3)
-    rig.now = 36; #expect(await o.tick(step: 0, paused: false, current: idle) == nil)
+    _ = await awayAt(rig, o, [0, 20, 40, 60])
+    rig.answers.append(ObserverRig.result(interject: "Cold pan.", away: true))
+    rig.now = 75; _ = await o.tick(step: 0, paused: false, current: idle)
     #expect(rig.sent.count == 4)
+    rig.now = 91; #expect(await o.tick(step: 0, paused: false, current: idle) == nil)
+    #expect(rig.sent.count == 5)
   }
 
   @Test func welcomesThemBackWithARecapFromTheLog() async {
     let rig = ObserverRig(); let o = rig.observer()
-    rig.answers = [ObserverRig.result(["cracked 3 eggs into the bowl"])] + (0..<3).map { _ in ObserverRig.result(away: true) }
-      + [ObserverRig.result()]
-    for t in [0.0, 3, 6, 9] { rig.now = t; _ = await o.tick(step: 0, paused: false, current: idle) }
-    rig.now = 40
+    rig.answers = [ObserverRig.result(["cracked 3 eggs into the bowl"])]
+    _ = await o.tick(step: 0, paused: false, current: idle)
+    _ = await awayAt(rig, o, [10, 30, 50, 70])
+    rig.answers += [ObserverRig.result(), ObserverRig.result()]
+    rig.now = 100; #expect(await o.tick(step: 0, paused: false, current: idle) == nil)
+    rig.now = 130
     #expect(await o.tick(step: 0, paused: false, current: idle)
       == .back("Welcome back. We're on step 1: Beat the eggs with the salt. So far: cracked 3 eggs into the bowl."))
     #expect(o.presence == .present)
@@ -189,9 +228,9 @@ import Testing
 
   @Test func speakingAlsoBringsThemBack() async {
     let rig = ObserverRig(); let o = rig.observer()
-    #expect(o.returned(step: 0) == nil)
-    rig.answers = (0..<3).map { _ in ObserverRig.result(away: true) }
-    for t in [0.0, 3, 6] { rig.now = t; _ = await o.tick(step: 0, paused: false, current: idle) }
+    rig.now = -500; #expect(o.returned(step: 0) == nil)
+    _ = await awayAt(rig, o, [0, 20, 40, 60])
+    rig.now = 90
     #expect(o.returned(step: 0) == "Welcome back. We're on step 1: Beat the eggs with the salt.")
     #expect(o.presence == .present)
   }

@@ -65,5 +65,7 @@ describe("observeFrame", () => {
     const spy: Completer = { async complete(req) { system = req.system; return { text: "{}", usage }; } };
     await observeFrame(ctx, "QUFB", spy);
     expect(system).toContain('"away": true');
+    expect(system).toContain("Looking at a phone, a screen, the sink or anywhere else in the kitchen is not away");
+    expect(system).not.toContain("a desk, a screen");
   });
 });

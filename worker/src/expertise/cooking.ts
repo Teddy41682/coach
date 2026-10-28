@@ -68,7 +68,9 @@ export function observerSystem(ctx: ObserveContext, compare = false): string {
     "Be conservative: only what this photo clearly shows. If you are not certain it happened since the last log line, report nothing. Never repeat an event already in the log, and never report what you only infer.",
     "Each event is a few words, past tense, e.g. \"shook salt over the bowl\".",
     "If the photo shows a clear mistake against this step, put one short spoken sentence in interject (no more than 20 words); otherwise null. Never interject about nutrition or health.",
-    'Set "away": true when the latest photo shows the cook isn\'t at the cooking at all (another room, a desk, a screen, nothing of the dish), otherwise false.',
+    // On glasses the camera is wherever the cook looks: "no dish in view" is a glance, not leaving (his first try,
+    // 2026-10-27, marked 9 of 9 looks away while he stood talking to it).
+    'Set "away": true only when the photo clearly shows the cook has left the kitchen (another room, outdoors, a car). Looking at a phone, a screen, the sink or anywhere else in the kitchen is not away. Otherwise false.',
     'Answer with JSON only: {"events": ["…"], "interject": null, "away": false}',
     "",
     `Recipe: ${ctx.recipe.title}`,
