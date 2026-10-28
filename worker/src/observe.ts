@@ -11,7 +11,8 @@ export type ObserveContext = {
   recent: string[];
 };
 
-export type Observation = { events: string[]; interject: string | null; usage: Usage };
+/** `away`: the photo shows the cook isn't at the cooking (another room, a desk, a screen) — the phone holds the place. */
+export type Observation = { events: string[]; interject: string | null; away: boolean; usage: Usage };
 
 const NONE: Usage = { input: 0, cachedInput: 0, output: 0 };
 const MAX_EVENTS = 5;
@@ -31,16 +32,16 @@ export async function observeFrame(ctx: ObserveContext, frame: string, model: Co
     ({ text, usage } = await model.complete({ system: observerSystem(ctx, !!previous), user: observerUser(ctx), images }));
   } catch (error) {
     console.warn("observe failed:", error instanceof Error ? error.message : String(error));
-    return { events: [], interject: null, usage: NONE };
+    return { events: [], interject: null, away: false, usage: NONE };
   }
   try {
-    const o = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as { events?: unknown; interject?: unknown };
+    const o = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as { events?: unknown; interject?: unknown; away?: unknown };
     const events = Array.isArray(o.events)
       ? o.events.filter((e): e is string => typeof e === "string" && e.trim() !== "").slice(0, MAX_EVENTS).map((e) => e.trim().slice(0, EVENT_MAX))
       : [];
     const said = typeof o.interject === "string" ? o.interject.trim() : "";
-    return { events, interject: said && said.length <= INTERJECT_MAX ? said : null, usage };
+    return { events, interject: said && said.length <= INTERJECT_MAX ? said : null, away: o.away === true, usage };
   } catch {
-    return { events: [], interject: null, usage };
+    return { events: [], interject: null, away: false, usage };
   }
 }

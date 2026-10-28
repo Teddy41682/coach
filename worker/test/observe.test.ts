@@ -14,14 +14,14 @@ const answering = (text: string): Completer => ({ async complete() { return { te
 describe("observeFrame", () => {
   it("returns the new events, any interjection, and the real usage", async () => {
     const r = await observeFrame(ctx, "QUFB", answering('{"events":["shook salt over the bowl"],"interject":null}'));
-    expect(r).toEqual({ events: ["shook salt over the bowl"], interject: null, usage });
+    expect(r).toEqual({ events: ["shook salt over the bowl"], interject: null, away: false, usage });
   });
   it("tolerates a fenced answer", async () => {
     const r = await observeFrame(ctx, "QUFB", answering('```json\n{"events":["picked up a fork"],"interject":null}\n```'));
     expect(r.events).toEqual(["picked up a fork"]);
   });
   it("an answer that isn't JSON means nothing seen, not a crash", async () => {
-    expect(await observeFrame(ctx, "QUFB", answering("I see a bowl."))).toEqual({ events: [], interject: null, usage });
+    expect(await observeFrame(ctx, "QUFB", answering("I see a bowl."))).toEqual({ events: [], interject: null, away: false, usage });
   });
   it("keeps at most 5 events of at most 100 characters", async () => {
     const many = JSON.stringify({ events: Array.from({ length: 8 }, (_, i) => `e${i} ` + "x".repeat(150)), interject: null });
@@ -44,7 +44,7 @@ describe("observeFrame", () => {
   });
   it("a model error means nothing seen", async () => {
     const broken: Completer = { async complete() { throw new Error("down"); } };
-    expect(await observeFrame(ctx, "QUFB", broken)).toEqual({ events: [], interject: null, usage: { input: 0, cachedInput: 0, output: 0 } });
+    expect(await observeFrame(ctx, "QUFB", broken)).toEqual({ events: [], interject: null, away: false, usage: { input: 0, cachedInput: 0, output: 0 } });
   });
 
   it("compares against the previous look when given one: earlier photo first, then the latest", async () => {
@@ -53,5 +53,17 @@ describe("observeFrame", () => {
     await observeFrame(ctx, "NOW", spy, "BEFORE");
     expect(seen!.images).toEqual(["BEFORE", "NOW"]);
     expect(seen!.system).toContain("Report only what changed between the earlier photo and the latest one");
+  });
+
+  it("says when the cook is away from the cooking — only when the model says so", async () => {
+    expect((await observeFrame(ctx, "QUFB", answering('{"events":[],"interject":null,"away":true}'))).away).toBe(true);
+    expect((await observeFrame(ctx, "QUFB", answering('{"events":[],"interject":null,"away":"yes"}'))).away).toBe(false);
+  });
+
+  it("asks the model whether the cook is at the cooking", async () => {
+    let system = "";
+    const spy: Completer = { async complete(req) { system = req.system; return { text: "{}", usage }; } };
+    await observeFrame(ctx, "QUFB", spy);
+    expect(system).toContain('"away": true');
   });
 });

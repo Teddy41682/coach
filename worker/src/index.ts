@@ -5,6 +5,7 @@ import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
 import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { observeFrame } from "./observe";
+import { jpegSize } from "./jpeg";
 import type { Completer } from "./model/connector";
 import { D1SessionStore, type SessionStore } from "./session";
 import { encodeEvent } from "./sse";
@@ -32,6 +33,12 @@ export const MAX_SEEN = 50;
 export const MAX_HISTORY = 12;
 export const MAX_LINE = 300;
 export const MAX_BODY_BYTES = 4_000_000;
+/** The observer's images are billed by pixels: nothing over this on its long side (the phone sends 640). */
+export const MAX_OBSERVE_SIDE = 1024;
+const smallJpeg = (b64: string) => {
+  const size = jpegSize(b64);
+  return !!size && Math.max(size.width, size.height) <= MAX_OBSERVE_SIDE;
+};
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
 const str = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
@@ -162,7 +169,8 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const ok = !!b && str(b.sessionId, 100) && Number.isInteger(b.stepIndex) && (b.stepIndex as number) >= 0
       && str(b.frame, MAX_FRAME_CHARS) && BASE64.test(b.frame as string)
       && Array.isArray(b.recent) && b.recent.length <= 10 && b.recent.every((l) => str(l, 100))
-      && (b.previous === undefined || (str(b.previous, MAX_FRAME_CHARS) && BASE64.test(b.previous as string)));
+      && (b.previous === undefined || (str(b.previous, MAX_FRAME_CHARS) && BASE64.test(b.previous as string)))
+      && smallJpeg(b.frame as string) && (b.previous === undefined || smallJpeg(b.previous as string));
     if (!ok || !b) return bad(400, "bad_request");
     const session = await deps.store.get(b.sessionId as string);
     if (!session) return bad(404, "unknown_session");
