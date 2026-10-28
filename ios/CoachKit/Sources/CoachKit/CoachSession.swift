@@ -18,6 +18,7 @@ public final class CoachSession {
   private let send: (TurnRequest) -> AsyncThrowingStream<CoachEvent, Error>
   private let say: (String) -> Void
   private let frames: (FrameNeed) -> [String]
+  private let seen: () -> [String]
   private let now: () -> Date
   /// When the current step began, so "done" can look back across all of it.
   public private(set) var stepStartedAt: Date
@@ -44,17 +45,22 @@ public final class CoachSession {
   ///   - send: one turn to the Worker, as its events arrive — the ack is spoken before the answer exists.
   ///   - say: speak a line.
   ///   - frames: the frames to show the coach, as base64 JPEG, for what the turn needs.
+  ///   - seen: the observer's log, newest last ("0:51 shook salt over the bowl"), sent with every turn.
   ///   - schedule: run a closure after a number of seconds (a timer).
   public init(
     recipe: CoachRecipe, sessionId: String, steps: [LinkedStep],
     send: @escaping (TurnRequest) -> AsyncThrowingStream<CoachEvent, Error>, say: @escaping (String) -> Void,
-    frames: @escaping (FrameNeed) -> [String], schedule: @escaping (Double, @escaping @MainActor () -> Void) -> Void,
+    frames: @escaping (FrameNeed) -> [String], seen: @escaping () -> [String] = { [] },
+    schedule: @escaping (Double, @escaping @MainActor () -> Void) -> Void,
     now: @escaping () -> Date = Date.init
   ) {
     self.recipe = recipe; self.sessionId = sessionId; self.steps = steps
-    self.send = send; self.say = say; self.frames = frames; self.schedule = schedule
+    self.send = send; self.say = say; self.frames = frames; self.seen = seen; self.schedule = schedule
     self.now = now; self.stepStartedAt = now()
   }
+
+  /// Something the coach said outside a turn (the observer speaking up, holding the place), so turns build on it.
+  public func noteCoach(_ line: String) { remember(.coach, line) }
 
   private func remember(_ who: HistoryLine.Who, _ text: String) {
     guard !text.isEmpty else { return }
@@ -103,7 +109,7 @@ public final class CoachSession {
   }
 
   private func ask(_ utterance: String, _ need: FrameNeed) async {
-    var turn = TurnRequest(sessionId: sessionId, stepIndex: stepIndex, utterance: utterance, frames: frames(need), seen: [])
+    var turn = TurnRequest(sessionId: sessionId, stepIndex: stepIndex, utterance: utterance, frames: frames(need), seen: seen())
     turn.history = history
     remember(.cook, utterance)
     var spoken: [String] = []

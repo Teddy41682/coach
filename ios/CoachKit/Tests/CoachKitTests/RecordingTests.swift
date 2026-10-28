@@ -20,6 +20,18 @@ import Testing
     #expect(third["step"] as? Int == 2)
   }
 
+  @Test func aLookIsRecordedWithWhatItSawAndWhatItCost() throws {
+    var log = RecordingLog(start: t0)
+    log.add(.seen(["shook salt over the bowl"], away: false, usage: ObserveUsage(input: 500, cachedInput: 0, output: 300)),
+            at: t0.addingTimeInterval(51))
+    let o = try JSONSerialization.jsonObject(with: Data(log.jsonLines().utf8)) as! [String: Any]
+    #expect(o["kind"] as? String == "seen")
+    #expect(o["events"] as? [String] == ["shook salt over the bowl"])
+    #expect(o["away"] as? Bool == false)
+    #expect(o["output"] as? Int == 300)
+    #expect(abs((o["cents"] as? Double ?? 0) - 0.19) < 0.0001)
+  }
+
   @Test func frameNamesSortInTimeOrder() {
     let a = RecordingLog.frameName(at: 1.5), b = RecordingLog.frameName(at: 12.04)
     #expect(a == "000001500.jpg")

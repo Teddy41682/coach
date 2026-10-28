@@ -14,6 +14,7 @@ import Testing
   var pending: [(Double, @MainActor () -> Void)] = []
   var now: Double = 0
   var needs: [CoachSession.FrameNeed] = []
+  var seen: [String] = []
 
   func session(steps: [String] = ["Whisk the flour.", "Add the eggs.", "Rest it."]) -> CoachSession {
     let recipe = CoachRecipe(title: "Pancakes", ingredients: [], steps: steps)
@@ -35,6 +36,7 @@ import Testing
       },
       say: { [unowned self] in self.said.append($0) },
       frames: { [unowned self] need in self.needs.append(need); return ["F"] },
+      seen: { [unowned self] in self.seen },
       schedule: { [unowned self] secs, fire in self.pending.append((self.now + secs, fire)) },
       now: { [unowned self] in Date(timeIntervalSince1970: self.now) })
   }
@@ -47,6 +49,20 @@ import Testing
 }
 
 @MainActor @Suite struct CoachSessionTests {
+  @Test func everyTurnCarriesTheObserversLog() async {
+    let rig = Rig(); let s = rig.session()
+    rig.seen = ["0:51 shook salt over the bowl"]
+    await s.handle(.question("did I add the salt?"))
+    #expect(rig.turns.last?.seen == ["0:51 shook salt over the bowl"])
+  }
+
+  @Test func whatTheObserverSaysJoinsTheConversation() async {
+    let rig = Rig(); let s = rig.session()
+    s.noteCoach("The pan's still cold.")
+    await s.handle(.question("ok?"))
+    #expect(rig.turns.last?.history?.first == HistoryLine(who: .coach, text: "The pan's still cold."))
+  }
+
   @Test func nextSpeaksTheNextStepWithoutTheNetwork() async {
     let rig = Rig(); let s = rig.session()
     await s.handle(.next)

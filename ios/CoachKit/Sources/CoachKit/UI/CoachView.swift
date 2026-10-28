@@ -34,6 +34,8 @@ public struct CoachView: View {
       Spacer()
       #if DEBUG
       if let t = runner.lastResponse { Text(String(format: "Last response: %.1f s", t)).font(.caption.monospaced()) }
+      if runner.away { Text("Away — holding step \(runner.stepNumber)").font(.callout).foregroundStyle(.secondary) }
+      Text(String(format: "Watching: %d looks · %.1f¢", runner.looks, runner.observeCents)).font(.caption.monospaced())
       #endif
       Button("Stop") { runner.stop() }.buttonStyle(.bordered)
     }
