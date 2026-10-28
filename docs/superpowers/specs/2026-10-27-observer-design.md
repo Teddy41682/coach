@@ -51,10 +51,15 @@ obvious I've moved on… I feel like someone's professional with me, working wit
 - **Cadence 2.5 s, one 640 px frame, `muse-spark-1.3` minimal, non-streaming.** One observation in flight at a time:
   if the last hasn't answered, the tick is skipped. Paused while a timer runs (the cook has walked away) and after
   the recipe is finished.
-- **Cost:** ~0.17¢ an observation (~1,000 input tokens at $1.25/M + ~100 output at $4.25/M — estimate, to be
-  measured) → ~4¢ a minute, ~60¢ for a 15-minute cook.
-- **Limits:** observations are counted apart from turns — at most 1,500 per device per day (~1 hour of cooking) —
-  and every 10 observations charge 1¢ against the global daily cap, so the overall ceiling still holds.
+- **Cost — measured 2026-10-27:** 0.15–0.47¢ a look. The picture is cheap (~530 input tokens); the model's
+  reasoning, billed as output (300–675 tokens even at "minimal"), is most of it. ~4–7¢ a minute. The reasoning is the
+  lever for the cost discussion, not the picture.
+- **Limits:** observations are counted apart from turns — at most 1,500 per device per day (~1 hour of cooking).
+  Each look reserves its worst case (1.5¢) against the global daily cap before the model is called, then settles to
+  the real cost Meta reports (millicents, so fractions add up; never below 0.1¢). Images must be strict JPEGs
+  ≤ 1024 px. A session answers only the device that started it. (Four security-review rounds, 2026-10-27.)
+- **Two photos, not one:** each look sends the previous look beside the new one and asks what *changed*. Shown one
+  photo and a log, it told a story on an identical frame (chicken, then garlic, then salt); with two, nothing.
 - **The log lives on the phone** and travels with each turn (`seen`, ≤ 50 lines of ≤ 100 characters), keeping the
   Worker stateless per request. The recorder writes every observation into `events.jsonl` (kind `seen`).
 
