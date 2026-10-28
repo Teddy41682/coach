@@ -3,3 +3,5 @@ node_modules/
 .dev.vars
 .build/
 .swiftpm/
+tools/.replay-sessions.json
+tools/__pycache__/
