@@ -46,6 +46,13 @@ public struct CoachClient: Sendable {
     return (s.sessionId, s.steps)
   }
 
+  /// One background look; a refusal (the day's cap, a bad frame) throws, and the observer stays quiet.
+  public func observe(_ o: ObserveRequest) async throws -> ObserveResult {
+    let (data, response) = try await URLSession.shared.data(for: try request("v1/observe", o))
+    guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+    return try JSONDecoder().decode(ObserveResult.self, from: data)
+  }
+
   public func turn(_ t: TurnRequest) -> AsyncThrowingStream<CoachEvent, Error> {
     AsyncThrowingStream { continuation in
       let task = Task {
