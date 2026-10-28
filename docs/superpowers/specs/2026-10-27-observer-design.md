@@ -43,6 +43,12 @@ shake of a salt shaker is caught only if it happens to land in one of those fram
 
 ## Not now
 
+- **Cost.** His call, 2026-10-27: build the observer as designed first, then take cost up as its own discussion —
+  ~4¢ a minute (estimate) is "way too much" for a product (a 20-minute cook ≈ 80¢; five cooks a week ≈ $16/month).
+  Levers to weigh then: only observe when the frame changes (on-device diff), cache-friendly prompts (Meta's cached
+  input is 8× cheaper), smaller frames, a cheaper open-weight model for observing only. To make that discussion
+  rest on facts, every observation records the model's real token usage, and the recording reports ¢/minute.
+
 - **Video clips at "done"** (Muse Spark accepts uploaded video): add only if the observer misses quick motions.
 - Changing the conversation's latency (the separate silence problem) — measured on the same test run.
 
