@@ -102,12 +102,14 @@ export class D1UsageStore implements UsageStore {
     return r?.cents ?? 0;
   }
   async chargeMillicents(day: string, millicents: number) {
-    // Integer division in SQLite: the cents column gains exactly the whole cents this charge crosses.
+    // Whole-cent arithmetic: D1 binds JS numbers as REAL, so without the CASTs SQLite divides with fractions
+    // (live, 2026-10-27: cents became 134.776). The cents column gains exactly the whole cents this charge crosses.
     await this.db
-      .prepare(`INSERT INTO usage (day, device, turns, cents, millicents) VALUES (?1, '*', 0, ?2 / 1000, ?2)
+      .prepare(`INSERT INTO usage (day, device, turns, cents, millicents)
+                  VALUES (?1, '*', 0, CAST(?2 AS INTEGER) / 1000, CAST(?2 AS INTEGER))
                 ON CONFLICT (day, device) DO UPDATE SET
-                  cents = cents + (millicents + ?2) / 1000 - millicents / 1000,
-                  millicents = millicents + ?2`)
+                  cents = cents + (CAST(millicents AS INTEGER) + CAST(?2 AS INTEGER)) / 1000 - CAST(millicents AS INTEGER) / 1000,
+                  millicents = CAST(millicents AS INTEGER) + CAST(?2 AS INTEGER)`)
       .bind(day, millicents)
       .run();
   }
