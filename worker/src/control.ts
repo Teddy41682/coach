@@ -1,7 +1,7 @@
-export type Action = "next" | "stay";
+export type Action = "next" | "stay" | "hold";
 
 /**
- * Takes the model's streamed text and holds back its control line — `[[next]]` or `[[stay]]`, the coach's
+ * Takes the model's streamed text and holds back its control line — `[[next]]`, `[[stay]]` or `[[hold]]`, the coach's
  * decision about the step — so it is never spoken, even when it arrives split across chunks. Text after the
  * control is dropped. No control, an unknown one, or an unfinished one means stay.
  */
@@ -19,7 +19,8 @@ export class ControlFilter {
       const close = this.pending.indexOf("]]", open + 2);
       const speak = this.pending.slice(0, open);
       if (close < 0) { this.pending = this.pending.slice(open); return speak; }
-      if (this.pending.slice(open + 2, close).trim().toLowerCase() === "next") this.action = "next";
+      const said = this.pending.slice(open + 2, close).trim().toLowerCase();
+      if (said === "next" || said === "hold") this.action = said;
       this.closed = true;
       this.pending = "";
       return speak;

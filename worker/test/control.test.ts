@@ -32,4 +32,7 @@ describe("ControlFilter", () => {
   it("an unknown control is not spoken and counts as stay", () => {
     expect(run("Fine. [[maybe]]")).toEqual({ spoken: "Fine. ", action: "stay" });
   });
+  it("holds the place on [[hold]], even split across chunks, and never speaks it", () => {
+    expect(run("I'll hold our place.\n[[ho", "ld]]")).toEqual({ spoken: "I'll hold our place.\n", action: "hold" });
+  });
 });

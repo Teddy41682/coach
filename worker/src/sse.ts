@@ -2,7 +2,7 @@
 export type CoachEvent =
   | { type: "ack"; text: string }
   | { type: "text"; text: string }
-  | { type: "action"; action: "next" | "stay" }
+  | { type: "action"; action: "next" | "stay" | "hold" }
   | { type: "done" }
   | { type: "error"; text: string };
 

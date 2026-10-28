@@ -6,6 +6,8 @@ import { MuseConnector } from "./model/muse";
 import { realMillicents, settleObserve } from "./limits";
 import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { observeFrame } from "./observe";
+import { isMindRequest, wakeMind, type MindContext } from "./mind";
+import { mindSystem, mindUser } from "./expertise/mind-prompt";
 import { jpegSize } from "./jpeg";
 import type { Completer } from "./model/connector";
 import { D1SessionStore, type SessionStore } from "./session";
@@ -21,7 +23,7 @@ export interface Env {
 
 /** What the routes need from the world, so tests can swap the store and the model. */
 /** `link` answers are long JSON after the model has reasoned, so linking gets a bigger token allowance. */
-export type Purpose = "turn" | "link" | "observe";
+export type Purpose = "turn" | "link" | "observe" | "mind";
 export type Deps = { store: SessionStore; usage: UsageStore; model: (purpose: Purpose) => ModelConnector; now: () => number };
 /** Measured 2026-10-27: linking alone used 281 reasoning + ~90 answer tokens and 400 truncated it; briefings add ~60 tokens a step. */
 export const LINK_MAX_TOKENS = 4_000;
@@ -189,6 +191,46 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     // The reserve taken by checkObserve settles to what the look really cost, by Meta's own count.
     await settleObserve(deps.usage, day, realMillicents(seen.usage));
     return Response.json(seen);
+  }
+
+  if (url.pathname === "/v1/mind") {
+    const got = await admit(request, env);
+    if (got instanceof Response) return got;
+    const device = deviceOf(request);
+    if (!device) return bad(400, "no_device");
+    const m = got.body;
+    // Every image the mind is shown is a strict JPEG ≤ 1024 px: Meta bills by pixels.
+    if (!isMindRequest(m) || [m.frame, m.previous, ...(m.frames ?? [])].some((f) => f !== undefined && !smallJpeg(f))) {
+      return bad(400, "bad_request");
+    }
+    const session = await deps.store.get(m.sessionId);
+    if (!session) return bad(404, "unknown_session");
+    if (session.device !== device) return bad(403, "not_your_session");
+    const plan = session.links[Math.min(m.stepIndex, Math.max(session.links.length - 1, 0))];
+    const ctx: MindContext = {
+      ...m, recipe: session.recipe, stepIngredients: plan?.ingredients ?? [],
+      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "", hardToSee: plan?.hardToSee ?? false },
+    };
+    const day = hstDay(deps.now());
+    if (m.wake === "spoke") {
+      // The cook's words: answered as a turn — streamed, charged like a turn — under the same judgement.
+      const frames = m.frames ?? [];
+      const turn: TurnRequest = { sessionId: m.sessionId, stepIndex: m.stepIndex, utterance: m.utterance ?? "", frames, seen: [] };
+      if ((await checkAndCount(deps.usage, device, day, costOf(frames.length))) !== "ok") {
+        const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
+        return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+      }
+      return new Response(runTurn(turn, deps.model("mind"), { system: mindSystem(ctx, true), user: mindUser(ctx) }), {
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
+    // The eyes woke it: one look, reserved at its worst case before the model is called, settled to the real cost.
+    if ((await checkObserve(deps.usage, device, day)) !== "ok") return bad(429, "daily_limit");
+    const model = deps.model("mind") as Partial<Completer>;
+    if (typeof model.complete !== "function") return bad(500, "no_completer");
+    const answer = await wakeMind(ctx, model as Completer);
+    await settleObserve(deps.usage, day, realMillicents(answer.usage));
+    return Response.json(answer);
   }
 
   return bad(404, "not_found");

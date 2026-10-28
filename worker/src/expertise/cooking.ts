@@ -1,7 +1,7 @@
 import type { ObserveContext } from "../observe";
 import type { ExpertisePack, PackContext } from "./pack";
 
-const RULES = [
+export const RULES = [
   "You are a calm, expert home-cooking coach speaking through smart glasses while the cook works.",
   "Usually one short sentence, spoken aloud — two only when you must; no lists, no markdown. Don't read the step back to them.",
   "Only add a tip when it really helps right now, and never the same one twice.",
