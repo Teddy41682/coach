@@ -10,9 +10,13 @@ export const DEVICE_DAILY_OBSERVES = 1_500;
 /*
  * …and each look is charged its REAL cost — Meta's own token counts, in millicents, accumulated on the shared '*' row
  * so fractions add up and rotating device ids can't dodge it (security review, 2026-10-27). Measured 0.15–0.47¢ a
- * look. A look is only let through while the day's cents have room; looks already in flight when the cap is hit
- * can each overshoot by one look's cost (≤ ~1¢ with the 1024 px and token caps) — accepted.
+ * look. Reserve, then settle: before the model is called, a look atomically reserves its worst case (≤ 1,200 output
+ * tokens ≈ 0.51¢ + two ≤ 1024 px images and the prompt ≈ 0.4¢, rounded up to 1.5¢), refused if that won't fit under
+ * the cap — so simultaneous looks can't overshoot it; afterwards it settles to the real cost, never below 0.1¢ (a
+ * failed call may still have been billed).
  */
+export const OBSERVE_RESERVE_MILLICENTS = 1_500;
+export const OBSERVE_MIN_MILLICENTS = 100;
 export const LIMIT_LINE = "I've reached today's limit — try again tomorrow.";
 /** Session start: planning reasons, then answers with up to 4,000 tokens (~1.7¢ at $4.25/M) plus the recipe; charged 3¢. */
 export const LINK_CENTS = 3;
@@ -36,8 +40,9 @@ export interface UsageStore {
   totalCents(day: string): Promise<number>;
   /** Adds a look's real cost (millicents) to the day; whole cents roll into the day's total in the same update. */
   chargeMillicents(day: string, millicents: number): Promise<void>;
-  /** Counts one observation if the device is under `max` and the day's cents have room (the cost comes after). */
-  tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult>;
+  /** Counts one observation and reserves `reserve` millicents, if the device is under `max` and the reserve fits
+   *  under `maxCents` — the reserve in one atomic conditional update; a refused reserve hands the count back. */
+  tryObserve(day: string, device: string, max: number, maxCents: number, reserve: number): Promise<CountResult>;
 }
 
 /** For tests. Synchronous inside, so it is atomic in the same way the D1 statements are. */
@@ -60,12 +65,15 @@ export class MemoryUsageStore implements UsageStore {
     this.cents.set(day, (this.cents.get(day) ?? 0) + Math.floor(after / 1000) - Math.floor(before / 1000));
   }
   private observes = new Map<string, number>();
-  async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
+  async tryObserve(day: string, device: string, max: number, maxCents: number, reserve: number): Promise<CountResult> {
     const k = `${day}|${device}`;
     const n = this.observes.get(k) ?? 0;
     if (n >= max) return "device";
-    if ((this.cents.get(day) ?? 0) >= maxCents) return "global";
+    // Spent so far, in millicents: turns' whole cents plus looks' exact millicents (the same formula as D1's).
+    const m = this.milli.get(day) ?? 0, spent = ((this.cents.get(day) ?? 0) - Math.floor(m / 1000)) * 1000 + m;
+    if (spent + reserve > maxCents * 1000) return "global";
     this.observes.set(k, n + 1);
+    await this.chargeMillicents(day, reserve);
     return "ok";
   }
 }
@@ -113,8 +121,7 @@ export class D1UsageStore implements UsageStore {
       .bind(day, millicents)
       .run();
   }
-  async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
-    if ((await this.totalCents(day)) >= maxCents) return "global";
+  async tryObserve(day: string, device: string, max: number, maxCents: number, reserve: number): Promise<CountResult> {
     const row = await this.db
       .prepare(
         `INSERT INTO usage (day, device, turns, cents, observes) VALUES (?1, ?2, 0, 0, 1)
@@ -123,7 +130,23 @@ export class D1UsageStore implements UsageStore {
       )
       .bind(day, device, max)
       .first<{ observes: number }>();
-    return row ? "ok" : "device";
+    if (!row) return "device";
+    // The reserve, atomically: only if it fits under the cap (looks are the only millicent spenders; turns' whole
+    // cents sit in `cents`, so the room left is the cap less both).
+    const r = await this.db
+      .prepare(`INSERT INTO usage (day, device, turns, cents, millicents)
+                  SELECT ?1, '*', 0, CAST(?2 AS INTEGER) / 1000, CAST(?2 AS INTEGER) WHERE CAST(?2 AS INTEGER) <= ?3 * 1000
+                ON CONFLICT (day, device) DO UPDATE SET
+                  cents = cents + (CAST(millicents AS INTEGER) + CAST(?2 AS INTEGER)) / 1000 - CAST(millicents AS INTEGER) / 1000,
+                  millicents = CAST(millicents AS INTEGER) + CAST(?2 AS INTEGER)
+                WHERE (cents - CAST(millicents AS INTEGER) / 1000) * 1000 + CAST(millicents AS INTEGER) + CAST(?2 AS INTEGER) <= ?3 * 1000`)
+      .bind(day, reserve, maxCents)
+      .run();
+    if (r.meta.changes === 0) {
+      await this.db.prepare("UPDATE usage SET observes = observes - 1 WHERE day = ?1 AND device = ?2").bind(day, device).run();
+      return "global";
+    }
+    return "ok";
   }
 }
 
@@ -138,7 +161,12 @@ export function hstDay(nowMs: number): string {
 }
 
 export function checkObserve(usage: UsageStore, device: string, day: string): Promise<CountResult> {
-  return usage.tryObserve(day, device, DEVICE_DAILY_OBSERVES, GLOBAL_DAILY_CENTS);
+  return usage.tryObserve(day, device, DEVICE_DAILY_OBSERVES, GLOBAL_DAILY_CENTS, OBSERVE_RESERVE_MILLICENTS);
+}
+
+/** After a look: trade its reserve for what it really cost (never below the minimum). */
+export function settleObserve(usage: UsageStore, day: string, real: number): Promise<void> {
+  return usage.chargeMillicents(day, Math.max(real, OBSERVE_MIN_MILLICENTS) - OBSERVE_RESERVE_MILLICENTS);
 }
 
 /** What a call really cost, in thousandths of a cent, from Meta's token counts (muse-spark-1.3 standard prices). */

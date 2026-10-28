@@ -81,4 +81,12 @@ describe("POST /v1/observe", () => {
     await worker.handle(post(body), env, d);
     expect(await d.usage.totalCents("2026-10-27")).toBe(1);
   });
+  it("a look the model fails on still settles its reserve, to the minimum", async () => {
+    const d = await deps();
+    d.model = () => ({ async *stream() { yield ""; }, async complete() { throw new Error("down"); } });
+    await worker.handle(post(body), env, d);
+    await worker.handle(post(body), env, d);
+    // Two reserves of 1.5¢ were taken; each settled to 0.1¢ → 0.2¢ in all, no whole cent.
+    expect(await d.usage.totalCents("2026-10-27")).toBe(0);
+  });
 });

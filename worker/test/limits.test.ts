@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryUsageStore, checkAndCount, checkObserve, costOf, realMillicents, DEVICE_DAILY_OBSERVES, DEVICE_DAILY_TURNS, GLOBAL_DAILY_CENTS, LIMIT_LINE, LINK_CENTS } from "../src/limits";
+import { MemoryUsageStore, checkAndCount, checkObserve, costOf, realMillicents, settleObserve, OBSERVE_RESERVE_MILLICENTS, OBSERVE_MIN_MILLICENTS, DEVICE_DAILY_OBSERVES, DEVICE_DAILY_TURNS, GLOBAL_DAILY_CENTS, LIMIT_LINE, LINK_CENTS } from "../src/limits";
 import worker from "../src/index";
 import { MemorySessionStore } from "../src/session";
 import type { ModelConnector } from "../src/model/connector";
@@ -53,8 +53,36 @@ describe("checkAndCount", () => {
 describe("checkObserve", () => {
   it("lets a device observe until its own daily cap", async () => {
     const u = new MemoryUsageStore();
-    for (let i = 0; i < DEVICE_DAILY_OBSERVES; i++) expect(await checkObserve(u, "d1", day)).toBe("ok");
+    for (let i = 0; i < DEVICE_DAILY_OBSERVES; i++) {
+      expect(await checkObserve(u, "d1", day)).toBe("ok");
+      await settleObserve(u, day, 300);
+    }
     expect(await checkObserve(u, "d1", day)).toBe("device");
+  });
+  it("reserves a look's worst case before it happens, then settles to the real cost", async () => {
+    const u = new MemoryUsageStore();
+    await checkObserve(u, "d1", day);
+    expect(await u.totalCents(day)).toBe(Math.floor(OBSERVE_RESERVE_MILLICENTS / 1000));
+    await settleObserve(u, day, 400);
+    expect(await u.totalCents(day)).toBe(0);
+    await checkObserve(u, "d1", day); await settleObserve(u, day, 700);
+    expect(await u.totalCents(day)).toBe(1);   // 0.4¢ + 0.7¢
+  });
+  it("refuses a look when its reserve won't fit under the day's cap", async () => {
+    const u = new MemoryUsageStore();
+    await u.chargeMillicents(day, (GLOBAL_DAILY_CENTS - 1) * 1000);
+    expect(await checkObserve(u, "d1", day)).toBe("global");
+  });
+  it("simultaneous looks each reserve, so together they can't pass the cap", async () => {
+    const u = new MemoryUsageStore();
+    await u.chargeMillicents(day, (GLOBAL_DAILY_CENTS - 5) * 1000);
+    const r = await Promise.all(Array.from({ length: 10 }, (_, i) => checkObserve(u, `d${i}`, day)));
+    expect(r.filter((x) => x === "ok").length).toBeLessThanOrEqual(Math.floor(5_000 / OBSERVE_RESERVE_MILLICENTS));
+  });
+  it("a failed look still costs the minimum", async () => {
+    const u = new MemoryUsageStore();
+    for (let i = 0; i < 10; i++) { await checkObserve(u, "d1", day); await settleObserve(u, day, 0); }
+    expect(await u.totalCents(day)).toBe(Math.floor(10 * OBSERVE_MIN_MILLICENTS / 1000));
   });
   it("charges each look's real cost, and fractions of a cent add up", async () => {
     const u = new MemoryUsageStore();
@@ -74,7 +102,7 @@ describe("checkObserve", () => {
   });
   it("observations don't use up the device's turns", async () => {
     const u = new MemoryUsageStore();
-    for (let i = 0; i < 200; i++) await checkObserve(u, "d1", day);
+    for (let i = 0; i < 200; i++) { await checkObserve(u, "d1", day); await settleObserve(u, day, 300); }
     expect(await checkAndCount(u, "d1", day, 1)).toBe("ok");
   });
 });

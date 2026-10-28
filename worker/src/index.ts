@@ -3,7 +3,7 @@ import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
-import { realMillicents } from "./limits";
+import { realMillicents, settleObserve } from "./limits";
 import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { observeFrame } from "./observe";
 import { jpegSize } from "./jpeg";
@@ -176,7 +176,8 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const session = await deps.store.get(b.sessionId as string);
     if (!session) return bad(404, "unknown_session");
     if (session.device !== device) return bad(403, "not_your_session");
-    if ((await checkObserve(deps.usage, device, hstDay(deps.now()))) !== "ok") return bad(429, "daily_limit");
+    const day = hstDay(deps.now());
+    if ((await checkObserve(deps.usage, device, day)) !== "ok") return bad(429, "daily_limit");
     const stepIndex = b.stepIndex as number;
     const plan = session.links[Math.min(stepIndex, Math.max(session.links.length - 1, 0))];
     const model = deps.model("observe") as Partial<Completer>;
@@ -185,8 +186,8 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
       { recipe: session.recipe, stepIndex, recent: b.recent as string[],
         briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "" } },
       b.frame as string, model as Completer, b.previous as string | undefined);
-    // Charged what it really cost, by Meta's own count — whatever the image headers claimed.
-    await deps.usage.chargeMillicents(hstDay(deps.now()), realMillicents(seen.usage));
+    // The reserve taken by checkObserve settles to what the look really cost, by Meta's own count.
+    await settleObserve(deps.usage, day, realMillicents(seen.usage));
     return Response.json(seen);
   }
 
