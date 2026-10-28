@@ -83,6 +83,16 @@ import Testing
     #expect(ended == 1)
   }
 
+  @Test func goingBackFromTheEndCooksAgain() async {
+    let rig = Rig(); let s = rig.session(steps: ["One.", "Two."])
+    await s.handle(.next); await s.handle(.next)
+    #expect(s.phase == .finished)
+    await s.handle(.previous)
+    #expect(s.phase == .cooking)
+    await s.handle(.next)
+    #expect(rig.said.last == "Step 2: Two.")
+  }
+
   @Test func nextSpeaksTheNextStepWithoutTheNetwork() async {
     let rig = Rig(); let s = rig.session()
     await s.handle(.next)

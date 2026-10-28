@@ -12,11 +12,13 @@ public final class Mind {
     public var finished: Bool
     public var cookSpeaking: Bool
     public var coachSpeaking: Bool
-    /// A spoken turn is in flight: it is the one call in flight, so the eyes wait.
+    /// A spoken turn is in flight (from the cook's words to the end of the answer): the one call in flight.
     public var turnActive: Bool
-    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool, turnActive: Bool = false) {
+    /// On the recipe's last step: the eyes may say it looks done, but finishing the recipe takes the cook's word.
+    public var lastStep: Bool
+    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool, turnActive: Bool = false, lastStep: Bool = false) {
       self.step = step; self.finished = finished; self.cookSpeaking = cookSpeaking; self.coachSpeaking = coachSpeaking
-      self.turnActive = turnActive
+      self.turnActive = turnActive; self.lastStep = lastStep
     }
   }
   /// What to do with an answer: say this (if anything), then this with the step.
@@ -114,8 +116,9 @@ public final class Mind {
 
     // Read again now the answer is here: a line about a step already left, or after the cook spoke, is dropped.
     s = state()
-    if s.step != req.stepIndex || lastCookSpoke > t { return nil }
+    if s.step != req.stepIndex || lastCookSpoke > t || s.turnActive { return nil }
     var say = answer.say, step = answer.step
+    if step == .next && s.lastStep { step = .stay }
     if say != nil || step == .next {
       let landed = now()
       if guardrails.allows(at: landed, cookSpeaking: s.cookSpeaking, coachSpeaking: s.coachSpeaking, finished: s.finished) {

@@ -90,6 +90,8 @@ public final class CoachSession {
     case .next:
       advance()
     case .previous:
+      // Going back from the end is cooking again (an unprompted finish could otherwise never be undone).
+      if phase == .finished { phase = .cooking }
       stepIndex = max(0, stepIndex - 1); stepStartedAt = now(); speakStep()
     case .repeatStep:
       speakStep()

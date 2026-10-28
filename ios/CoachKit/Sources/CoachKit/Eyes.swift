@@ -115,7 +115,11 @@ public struct Timeline: Sendable {
   public func lines(_ limit: Int = 50) -> [String] {
     entries.suffix(limit).map { e in
       let t = Int(max(0, e.seconds).rounded(.down))
-      return String("\(t / 60):\(String(format: "%02d", t % 60)) \(e.kind.rawValue): \(e.text)".prefix(Self.lineMax))
+      // Clipped by UTF-16 units — the Worker's count — not by Characters: an emoji near the end would otherwise
+      // push the line over 200 and the Worker would refuse every wake (review, 2026-10-28).
+      var line = "\(t / 60):\(String(format: "%02d", t % 60)) \(e.kind.rawValue): \(e.text)"
+      while line.utf16.count > Self.lineMax { line.removeLast() }
+      return line
     }
   }
 }

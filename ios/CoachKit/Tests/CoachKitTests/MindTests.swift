@@ -139,6 +139,24 @@ import Testing
     #expect(rig.sent.isEmpty)
   }
 
+  @Test func anAnswerLandingDuringASpokenTurnIsDropped() async {
+    let rig = MindRig(); let m = rig.mind()
+    rig.hold = true
+    let first = Task { await rig.tick(m, at: 1) }
+    while rig.gate == nil { await Task.yield() }
+    rig.state.turnActive = true
+    rig.answers = [MindRig.answer(say: "Cold pan.", step: .next)]
+    rig.gate?.resume()
+    #expect(await first.value == nil)
+  }
+
+  @Test func theEyesNeverFinishTheRecipe() async {
+    let rig = MindRig(); let m = rig.mind()
+    rig.state.lastStep = true
+    rig.answers = [MindRig.answer(say: "That's done.", step: .next)]
+    #expect(await rig.tick(m, at: 1) == Mind.Outcome(say: "That's done.", step: .stay))
+  }
+
   @Test func nothingUnpromptedOnceFinished() async {
     let rig = MindRig(); let m = rig.mind()
     rig.state.finished = true

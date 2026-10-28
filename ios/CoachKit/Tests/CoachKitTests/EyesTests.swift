@@ -115,6 +115,13 @@ func greyJPEG(width: Int = 504, height: Int = 896, base: CGFloat = 0.3, block: C
     #expect(t.lines()[0].count <= 200)
   }
 
+  @Test func clipsByTheWorkersCountNotBySwiftsCharacters() {
+    // The Worker counts UTF-16 units: an emoji near the end must not push a clipped line over 200.
+    var t = Timeline(start: t0)
+    t.add(.coach, String(repeating: "x", count: 185) + String(repeating: "🍳", count: 20), at: t0)
+    #expect(t.lines()[0].utf16.count <= 200)
+  }
+
   @Test func sendsTheNewestFiftyButKeepsEverything() {
     var t = Timeline(start: t0)
     for i in 0..<60 { t.add(.saw, "e\(i)", at: t0.addingTimeInterval(Double(i * 20))) }

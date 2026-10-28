@@ -42,6 +42,18 @@ public final class CoachRunner {
   }
 
   private var stopped = false
+  /// From the cook's words until the answer has finished streaming: the one mind call in flight (review, 2026-10-28 —
+  /// `.thinking` alone ended at the ack, so an eye wake could splice a line into the coach's own answer).
+  private var turning = false
+
+  /// Stopped while starting (the screen closed mid-start): put down whatever came up during the await, so the
+  /// glasses stream and the microphone don't come up after the screen is gone (J'habite review, 2026-10-28).
+  private func abandoned() -> Bool {
+    guard stopped else { return false }
+    device.stop()
+    listener?.stop()
+    return true
+  }
 
   private func say(_ line: String) {
     guard !stopped else { return }
@@ -61,8 +73,11 @@ public final class CoachRunner {
   public func start() async {
     do {
       if let recorder { device.onFrame = { recorder.frame($0, at: $1) }; recorder.note(.note("start: \(recipe.title)")) }
+      if stopped { return }
       try await device.start()
+      if abandoned() { return }
       let (sessionId, steps) = try await client.start(recipe)
+      if abandoned() { return }
       let mind = Mind(
         sessionId: sessionId, start: Date(),
         call: { [client] in try await client.mind($0) },
@@ -104,6 +119,7 @@ public final class CoachRunner {
       self.listener = listener
       listener.record(into: recorder?.mic)
       try await listener.start()
+      if abandoned() { return }
       watchAudioRoute()
       say("Let's make \(recipe.title). Step 1: \(steps.first?.text ?? "")")
       refresh()
@@ -119,11 +135,15 @@ public final class CoachRunner {
         mind.cookSpoke(at: Date(), showing: newest()?.thumb)
         away = mind.held
         activity = .thinking
+        turning = true
         await session.handle(intent)
+        turning = false
+        if stopped { return }
         refresh()
         if !speaker.isSpeaking { activity = .listening }
       }
     } catch {
+      if abandoned() { return }
       activity = .stopped("Couldn't start: \(error.localizedDescription)")
       recorder?.note(.note("failed: \(error.localizedDescription)"))
     }
@@ -161,7 +181,8 @@ public final class CoachRunner {
         let outcome = await mind.tick {
           Mind.Now(step: session.stepIndex, finished: session.phase == .finished,
                    cookSpeaking: self.listener?.isHearing ?? false, coachSpeaking: self.speaker.isSpeaking,
-                   turnActive: self.activity == .thinking)
+                   turnActive: self.turning,
+                   lastStep: session.stepIndex >= session.steps.count - 1)
         }
         self.away = mind.held
         guard let outcome, !self.stopped else { continue }
