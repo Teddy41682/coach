@@ -58,11 +58,12 @@ export const cooking: ExpertisePack = {
 };
 
 /** The observer's instructions: what's new in this one photo, conservatively, and speak up only for a clear mistake. */
-export function observerSystem(ctx: ObserveContext): string {
+export function observerSystem(ctx: ObserveContext, compare = false): string {
   const { steps } = ctx.recipe;
   const i = Math.min(Math.max(ctx.stepIndex, 0), Math.max(steps.length - 1, 0));
   return [
     "You watch someone cooking through their smart glasses, one photo every few seconds.",
+    ...(compare ? ["You get two photos: the earlier one first, then the latest. Report only what changed between the earlier photo and the latest one; if they look the same, report nothing."] : []),
     "Report only what is NEW compared with the log: an ingredient added (use the recipe's names), a tool picked up, an action done (cracked, poured, stirred, chopped, flipped).",
     "Be conservative: only what this photo clearly shows. If you are not certain it happened since the last log line, report nothing. Never repeat an event already in the log, and never report what you only infer.",
     "Each event is a few words, past tense, e.g. \"shook salt over the bowl\".",

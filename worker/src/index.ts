@@ -158,10 +158,11 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (got instanceof Response) return got;
     const device = deviceOf(request);
     if (!device) return bad(400, "no_device");
-    const b = got.body as { sessionId?: unknown; stepIndex?: unknown; frame?: unknown; recent?: unknown } | null;
+    const b = got.body as { sessionId?: unknown; stepIndex?: unknown; frame?: unknown; previous?: unknown; recent?: unknown } | null;
     const ok = !!b && str(b.sessionId, 100) && Number.isInteger(b.stepIndex) && (b.stepIndex as number) >= 0
       && str(b.frame, MAX_FRAME_CHARS) && BASE64.test(b.frame as string)
-      && Array.isArray(b.recent) && b.recent.length <= 10 && b.recent.every((l) => str(l, 100));
+      && Array.isArray(b.recent) && b.recent.length <= 10 && b.recent.every((l) => str(l, 100))
+      && (b.previous === undefined || (str(b.previous, MAX_FRAME_CHARS) && BASE64.test(b.previous as string)));
     if (!ok || !b) return bad(400, "bad_request");
     const session = await deps.store.get(b.sessionId as string);
     if (!session) return bad(404, "unknown_session");
@@ -174,7 +175,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const seen = await observeFrame(
       { recipe: session.recipe, stepIndex, recent: b.recent as string[],
         briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "" } },
-      b.frame as string, model as Completer);
+      b.frame as string, model as Completer, b.previous as string | undefined);
     return Response.json(seen);
   }
 

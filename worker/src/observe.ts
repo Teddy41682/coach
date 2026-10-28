@@ -22,10 +22,13 @@ const INTERJECT_MAX = 160;
  * One look at the cook, in the background: what is new since the log, and — only for a clear mistake — one line to
  * say unprompted. Anything malformed or failed means nothing was seen; the observer never breaks the cook.
  */
-export async function observeFrame(ctx: ObserveContext, frame: string, model: Completer): Promise<Observation> {
+export async function observeFrame(ctx: ObserveContext, frame: string, model: Completer, previous?: string): Promise<Observation> {
   let text = "", usage = NONE;
+  // With the previous look beside it, the question becomes "what changed?" — shown one photo and a log, the model
+  // told a story on an identical frame (chicken, then garlic, then salt, 2026-10-27).
+  const images = previous ? [previous, frame] : [frame];
   try {
-    ({ text, usage } = await model.complete({ system: observerSystem(ctx), user: observerUser(ctx), images: [frame] }));
+    ({ text, usage } = await model.complete({ system: observerSystem(ctx, !!previous), user: observerUser(ctx), images }));
   } catch (error) {
     console.warn("observe failed:", error instanceof Error ? error.message : String(error));
     return { events: [], interject: null, usage: NONE };

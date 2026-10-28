@@ -52,4 +52,8 @@ describe("POST /v1/observe", () => {
   it("refuses a device that didn't start the session", async () => {
     expect((await worker.handle(post(body, { ...H, "X-Coach-Device": "someone-else" }), env, await deps())).status).toBe(403);
   });
+  it("takes an optional previous frame, and refuses one that isn't base64", async () => {
+    expect((await worker.handle(post({ ...body, previous: "QUFB" }), env, await deps())).status).toBe(200);
+    expect((await worker.handle(post({ ...body, previous: "no!" }), env, await deps())).status).toBe(400);
+  });
 });

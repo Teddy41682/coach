@@ -46,4 +46,12 @@ describe("observeFrame", () => {
     const broken: Completer = { async complete() { throw new Error("down"); } };
     expect(await observeFrame(ctx, "QUFB", broken)).toEqual({ events: [], interject: null, usage: { input: 0, cachedInput: 0, output: 0 } });
   });
+
+  it("compares against the previous look when given one: earlier photo first, then the latest", async () => {
+    let seen: { system: string; images: string[] } | undefined;
+    const spy: Completer = { async complete(req) { seen = req; return { text: '{"events":[]}', usage }; } };
+    await observeFrame(ctx, "NOW", spy, "BEFORE");
+    expect(seen!.images).toEqual(["BEFORE", "NOW"]);
+    expect(seen!.system).toContain("Report only what changed between the earlier photo and the latest one");
+  });
 });
