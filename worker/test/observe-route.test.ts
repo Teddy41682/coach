@@ -49,4 +49,7 @@ describe("POST /v1/observe", () => {
     expect((await worker.handle(post(body), env, d)).status).toBe(429);
     expect(asked).toBe(false);
   });
+  it("refuses a device that didn't start the session", async () => {
+    expect((await worker.handle(post(body, { ...H, "X-Coach-Device": "someone-else" }), env, await deps())).status).toBe(403);
+  });
 });

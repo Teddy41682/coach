@@ -56,12 +56,17 @@ describe("checkObserve", () => {
     for (let i = 0; i < DEVICE_DAILY_OBSERVES; i++) expect(await checkObserve(u, "d1", day)).toBe("ok");
     expect(await checkObserve(u, "d1", day)).toBe("device");
   });
-  it("charges 1¢ to the global total every 10 observations", async () => {
+  it("charges 1¢ to the global total every 3 observations (measured ~0.3¢ each)", async () => {
     const u = new MemoryUsageStore();
-    for (let i = 0; i < 9; i++) await checkObserve(u, "d1", day);
+    for (let i = 0; i < 2; i++) await checkObserve(u, "d1", day);
     expect(await u.totalCents(day)).toBe(0);
     await checkObserve(u, "d1", day);
     expect(await u.totalCents(day)).toBe(1);
+  });
+  it("counts the charge across all devices, so rotating device ids doesn't dodge it", async () => {
+    const u = new MemoryUsageStore();
+    for (let i = 0; i < 30; i++) await checkObserve(u, `dev-${i}`, day);   // one look per device
+    expect(await u.totalCents(day)).toBe(10);
   });
   it("stops observing when the global cap is spent", async () => {
     const u = new MemoryUsageStore();

@@ -64,3 +64,14 @@ describe("model purposes", () => {
     expect(purposes).toEqual(["link"]);
   });
 });
+
+describe("sessions belong to their device", () => {
+  it("refuses a turn from a device that didn't start the session", async () => {
+    const d = deps(linker);
+    const made = await worker.handle(new Request("https://c/v1/session", { method: "POST", headers: H, body: JSON.stringify({ recipe }) }), env, d);
+    const { sessionId } = await made.json() as { sessionId: string };
+    const turn = { sessionId, stepIndex: 0, utterance: "hi", frames: [], seen: [] };
+    const r = await worker.handle(new Request("https://c/v1/turn", { method: "POST", headers: { ...H, "X-Coach-Device": "other" }, body: JSON.stringify(turn) }), env, d);
+    expect(r.status).toBe(403);
+  });
+});

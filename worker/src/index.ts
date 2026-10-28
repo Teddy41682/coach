@@ -133,6 +133,8 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (!device) return bad(400, "no_device");
     const session = await deps.store.get(turn.sessionId);
     if (!session) return bad(404, "unknown_session");
+    // A session belongs to the device that started it, so caps can't be dodged by inventing device ids.
+    if (session.device !== device) return bad(403, "not_your_session");
     if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), costOf(turn.frames.length))) !== "ok") {
       // Spoken like any answer, so the cook hears why; the model is never asked.
       const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
@@ -163,6 +165,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (!ok || !b) return bad(400, "bad_request");
     const session = await deps.store.get(b.sessionId as string);
     if (!session) return bad(404, "unknown_session");
+    if (session.device !== device) return bad(403, "not_your_session");
     if ((await checkObserve(deps.usage, device, hstDay(deps.now()))) !== "ok") return bad(429, "daily_limit");
     const stepIndex = b.stepIndex as number;
     const plan = session.links[Math.min(stepIndex, Math.max(session.links.length - 1, 0))];

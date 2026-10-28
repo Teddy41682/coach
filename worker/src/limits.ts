@@ -7,8 +7,12 @@ export const DEVICE_DAILY_TURNS = 150;
 export const GLOBAL_DAILY_CENTS = 1_500;
 /** Observations are counted apart from turns: ~1 hour of cooking at one every 2.5 s… */
 export const DEVICE_DAILY_OBSERVES = 1_500;
-/** …and every 10th charges 1¢ to the global total, so the overall ceiling still holds (~0.17¢ each, estimated). */
-export const OBSERVES_PER_CENT = 10;
+/**
+ * …and every 3rd observation across ALL devices charges 1¢ to the global total: measured 2026-10-27 at 0.26–0.35¢
+ * a look (the model's reasoning, billed as output, dominates). Counted on the shared '*' row so rotating device ids
+ * can't dodge it (security review).
+ */
+export const OBSERVES_PER_CENT = 3;
 export const LIMIT_LINE = "I've reached today's limit — try again tomorrow.";
 /** Session start: planning reasons, then answers with up to 4,000 tokens (~1.7¢ at $4.25/M) plus the recipe; charged 3¢. */
 export const LINK_CENTS = 3;
@@ -48,13 +52,16 @@ export class MemoryUsageStore implements UsageStore {
   }
   async totalCents(day: string) { return this.cents.get(day) ?? 0; }
   private observes = new Map<string, number>();
+  private allObserves = new Map<string, number>();
   async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
     const k = `${day}|${device}`;
     const n = this.observes.get(k) ?? 0;
     if (n >= max) return "device";
-    const charge = (n + 1) % OBSERVES_PER_CENT === 0 ? 1 : 0;
-    if ((this.cents.get(day) ?? 0) + Math.max(charge, 1) > maxCents) return "global";
+    const all = (this.allObserves.get(day) ?? 0) + 1;
+    const charge = all % OBSERVES_PER_CENT === 0 ? 1 : 0;
+    if ((this.cents.get(day) ?? 0) + 1 > maxCents) return "global";
     this.observes.set(k, n + 1);
+    this.allObserves.set(day, all);
     if (charge) this.cents.set(day, (this.cents.get(day) ?? 0) + charge);
     return "ok";
   }
@@ -102,15 +109,21 @@ export class D1UsageStore implements UsageStore {
       .bind(day, device, max)
       .first<{ observes: number }>();
     if (!row) return "device";
-    if (row.observes % OBSERVES_PER_CENT === 0) {
-      const all = await this.db
-        .prepare(
-          `INSERT INTO usage (day, device, turns, cents) VALUES (?1, '*', 0, 1)
-           ON CONFLICT (day, device) DO UPDATE SET cents = cents + 1 WHERE cents + 1 <= ?2`,
-        )
-        .bind(day, maxCents)
-        .run();
-      if (all.meta.changes === 0) return "global";
+    // One shared count and charge on the '*' row, in one conditional upsert: every OBSERVES_PER_CENT-th look
+    // across all devices adds 1¢, and none goes through once the day's cents are spent.
+    const all = await this.db
+      .prepare(
+        `INSERT INTO usage (day, device, turns, cents, observes) VALUES (?1, '*', 0, 0, 1)
+         ON CONFLICT (day, device) DO UPDATE SET
+           observes = observes + 1,
+           cents = cents + CASE WHEN (observes + 1) % ?3 = 0 THEN 1 ELSE 0 END
+         WHERE cents + 1 <= ?2`,
+      )
+      .bind(day, maxCents, OBSERVES_PER_CENT)
+      .run();
+    if (all.meta.changes === 0) {
+      await this.db.prepare("UPDATE usage SET observes = observes - 1 WHERE day = ?1 AND device = ?2").bind(day, device).run();
+      return "global";
     }
     return "ok";
   }
