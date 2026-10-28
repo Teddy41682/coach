@@ -34,6 +34,8 @@ export type CountResult = "ok" | "device" | "global";
 export interface UsageStore {
   tryAdd(day: string, device: string, cents: number, maxTurns: number, maxCents: number): Promise<CountResult>;
   totalCents(day: string): Promise<number>;
+  /** Adds cents to the day's total unconditionally — for cost already incurred, so the ceiling sees it. */
+  addCents(day: string, cents: number): Promise<void>;
   /** Counts one observation if the device is under `max` and the global total has room; atomic like `tryAdd`. */
   tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult>;
 }
@@ -51,6 +53,7 @@ export class MemoryUsageStore implements UsageStore {
     return "ok";
   }
   async totalCents(day: string) { return this.cents.get(day) ?? 0; }
+  async addCents(day: string, cents: number) { this.cents.set(day, (this.cents.get(day) ?? 0) + cents); }
   private observes = new Map<string, number>();
   private allObserves = new Map<string, number>();
   async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
@@ -98,6 +101,13 @@ export class D1UsageStore implements UsageStore {
     const r = await this.db.prepare("SELECT cents FROM usage WHERE day = ?1 AND device = '*'").bind(day).first<{ cents: number }>();
     return r?.cents ?? 0;
   }
+  async addCents(day: string, cents: number) {
+    await this.db
+      .prepare(`INSERT INTO usage (day, device, turns, cents) VALUES (?1, '*', 0, ?2)
+                ON CONFLICT (day, device) DO UPDATE SET cents = cents + ?2`)
+      .bind(day, cents)
+      .run();
+  }
   async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
     if ((await this.totalCents(day)) >= maxCents) return "global";
     const row = await this.db
@@ -141,4 +151,9 @@ export function hstDay(nowMs: number): string {
 
 export function checkObserve(usage: UsageStore, device: string, day: string): Promise<CountResult> {
   return usage.tryObserve(day, device, DEVICE_DAILY_OBSERVES, GLOBAL_DAILY_CENTS);
+}
+
+/** What a call really cost, in cents, from Meta's own token counts (muse-spark-1.3 standard prices). */
+export function realCents(u: { input: number; cachedInput: number; output: number }): number {
+  return ((u.input - u.cachedInput) * 1.25 + u.cachedInput * 0.15 + u.output * 4.25) / 1e6 * 100;
 }

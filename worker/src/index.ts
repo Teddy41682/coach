@@ -3,6 +3,7 @@ import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
+import { realCents } from "./limits";
 import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { observeFrame } from "./observe";
 import { jpegSize } from "./jpeg";
@@ -184,6 +185,10 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
       { recipe: session.recipe, stepIndex, recent: b.recent as string[],
         briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "" } },
       b.frame as string, model as Completer, b.previous as string | undefined);
+    // The flat charge (1¢ per 3 looks) covers an ordinary look; anything a look really cost beyond a whole cent —
+    // by Meta's own count, whatever the image headers claimed — goes on the day's total too.
+    const extra = Math.floor(realCents(seen.usage));
+    if (extra > 0) await deps.usage.addCents(hstDay(deps.now()), extra);
     return Response.json(seen);
   }
 

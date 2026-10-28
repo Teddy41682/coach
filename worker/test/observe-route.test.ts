@@ -7,16 +7,17 @@ const env = { MODEL_API_KEY: "k", COACH_APP_KEY: "app" };
 const H = { "Content-Type": "application/json", "X-Coach-Key": "app", "X-Coach-Device": "d1" };
 /** A 640×360 JPEG header — enough for the size check, which reads only the header. */
 function jpeg(width: number, height: number): string {
-  const b = [0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, height >> 8, height & 255, width >> 8, width & 255, 0x01, 0x01, 0x11, 0x00];
+  const b = [0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, height >> 8, height & 255, width >> 8, width & 255, 0x01, 0x01, 0x11, 0x00,
+    0xff, 0xda, 0x00, 0x02];
   return btoa(String.fromCharCode(...b));
 }
 const body = { sessionId: "s1", stepIndex: 0, frame: jpeg(640, 360), recent: ["0:12 cracked 2 eggs into the bowl"] };
 const plan = { ingredients: ["eggs"], done: "Smooth.", mistakes: "No salt.", tip: "", hardToSee: false };
 
-async function deps(answer = '{"events":["shook salt over the bowl"],"interject":null}') {
+async function deps(answer = '{"events":["shook salt over the bowl"],"interject":null}', used = { input: 900, cachedInput: 100, output: 30 }) {
   const store = new MemorySessionStore();
   await store.put({ id: "s1", device: "d1", recipe: { title: "Eggs", ingredients: [{ amount: "3", item: "eggs" }], steps: ["Beat the eggs."] }, links: [plan], createdAt: 0 });
-  const model = { async *stream() { yield ""; }, async complete() { return { text: answer, usage: { input: 900, cachedInput: 100, output: 30 } }; } };
+  const model = { async *stream() { yield ""; }, async complete() { return { text: answer, usage: used }; } };
   return { store, usage: new MemoryUsageStore(), model: () => model, now: () => Date.parse("2026-10-27T20:00:00Z") };
 }
 const post = (b: unknown, headers: Record<string, string> = H) =>
@@ -67,5 +68,15 @@ describe("POST /v1/observe", () => {
   });
   it("refuses a frame that isn't a JPEG", async () => {
     expect((await worker.handle(post({ ...body, frame: "QUFB" }), env, await deps())).status).toBe(400);
+  });
+  it("charges the day's total by what Meta says the look really cost, whatever the headers claimed", async () => {
+    const d = await deps(undefined, { input: 2_000_000, cachedInput: 0, output: 0 });   // $2.50 = 250¢
+    await worker.handle(post(body), env, d);
+    expect(await d.usage.totalCents("2026-10-27")).toBe(250);
+  });
+  it("an ordinary look adds nothing beyond the flat charge", async () => {
+    const d = await deps();
+    await worker.handle(post(body), env, d);
+    expect(await d.usage.totalCents("2026-10-27")).toBe(0);
   });
 });
