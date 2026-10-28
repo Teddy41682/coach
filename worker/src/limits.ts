@@ -7,12 +7,12 @@ export const DEVICE_DAILY_TURNS = 150;
 export const GLOBAL_DAILY_CENTS = 1_500;
 /** Observations are counted apart from turns: ~1 hour of cooking at one every 2.5 s… */
 export const DEVICE_DAILY_OBSERVES = 1_500;
-/**
- * …and every 3rd observation across ALL devices charges 1¢ to the global total: measured 2026-10-27 at 0.26–0.35¢
- * a look (the model's reasoning, billed as output, dominates). Counted on the shared '*' row so rotating device ids
- * can't dodge it (security review).
+/*
+ * …and each look is charged its REAL cost — Meta's own token counts, in millicents, accumulated on the shared '*' row
+ * so fractions add up and rotating device ids can't dodge it (security review, 2026-10-27). Measured 0.15–0.47¢ a
+ * look. A look is only let through while the day's cents have room; looks already in flight when the cap is hit
+ * can each overshoot by one look's cost (≤ ~1¢ with the 1024 px and token caps) — accepted.
  */
-export const OBSERVES_PER_CENT = 3;
 export const LIMIT_LINE = "I've reached today's limit — try again tomorrow.";
 /** Session start: planning reasons, then answers with up to 4,000 tokens (~1.7¢ at $4.25/M) plus the recipe; charged 3¢. */
 export const LINK_CENTS = 3;
@@ -34,9 +34,9 @@ export type CountResult = "ok" | "device" | "global";
 export interface UsageStore {
   tryAdd(day: string, device: string, cents: number, maxTurns: number, maxCents: number): Promise<CountResult>;
   totalCents(day: string): Promise<number>;
-  /** Adds cents to the day's total unconditionally — for cost already incurred, so the ceiling sees it. */
-  addCents(day: string, cents: number): Promise<void>;
-  /** Counts one observation if the device is under `max` and the global total has room; atomic like `tryAdd`. */
+  /** Adds a look's real cost (millicents) to the day; whole cents roll into the day's total in the same update. */
+  chargeMillicents(day: string, millicents: number): Promise<void>;
+  /** Counts one observation if the device is under `max` and the day's cents have room (the cost comes after). */
   tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult>;
 }
 
@@ -53,19 +53,19 @@ export class MemoryUsageStore implements UsageStore {
     return "ok";
   }
   async totalCents(day: string) { return this.cents.get(day) ?? 0; }
-  async addCents(day: string, cents: number) { this.cents.set(day, (this.cents.get(day) ?? 0) + cents); }
+  private milli = new Map<string, number>();
+  async chargeMillicents(day: string, millicents: number) {
+    const before = this.milli.get(day) ?? 0, after = before + millicents;
+    this.milli.set(day, after);
+    this.cents.set(day, (this.cents.get(day) ?? 0) + Math.floor(after / 1000) - Math.floor(before / 1000));
+  }
   private observes = new Map<string, number>();
-  private allObserves = new Map<string, number>();
   async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
     const k = `${day}|${device}`;
     const n = this.observes.get(k) ?? 0;
     if (n >= max) return "device";
-    const all = (this.allObserves.get(day) ?? 0) + 1;
-    const charge = all % OBSERVES_PER_CENT === 0 ? 1 : 0;
-    if ((this.cents.get(day) ?? 0) + 1 > maxCents) return "global";
+    if ((this.cents.get(day) ?? 0) >= maxCents) return "global";
     this.observes.set(k, n + 1);
-    this.allObserves.set(day, all);
-    if (charge) this.cents.set(day, (this.cents.get(day) ?? 0) + charge);
     return "ok";
   }
 }
@@ -101,11 +101,14 @@ export class D1UsageStore implements UsageStore {
     const r = await this.db.prepare("SELECT cents FROM usage WHERE day = ?1 AND device = '*'").bind(day).first<{ cents: number }>();
     return r?.cents ?? 0;
   }
-  async addCents(day: string, cents: number) {
+  async chargeMillicents(day: string, millicents: number) {
+    // Integer division in SQLite: the cents column gains exactly the whole cents this charge crosses.
     await this.db
-      .prepare(`INSERT INTO usage (day, device, turns, cents) VALUES (?1, '*', 0, ?2)
-                ON CONFLICT (day, device) DO UPDATE SET cents = cents + ?2`)
-      .bind(day, cents)
+      .prepare(`INSERT INTO usage (day, device, turns, cents, millicents) VALUES (?1, '*', 0, ?2 / 1000, ?2)
+                ON CONFLICT (day, device) DO UPDATE SET
+                  cents = cents + (millicents + ?2) / 1000 - millicents / 1000,
+                  millicents = millicents + ?2`)
+      .bind(day, millicents)
       .run();
   }
   async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
@@ -118,24 +121,7 @@ export class D1UsageStore implements UsageStore {
       )
       .bind(day, device, max)
       .first<{ observes: number }>();
-    if (!row) return "device";
-    // One shared count and charge on the '*' row, in one conditional upsert: every OBSERVES_PER_CENT-th look
-    // across all devices adds 1¢, and none goes through once the day's cents are spent.
-    const all = await this.db
-      .prepare(
-        `INSERT INTO usage (day, device, turns, cents, observes) VALUES (?1, '*', 0, 0, 1)
-         ON CONFLICT (day, device) DO UPDATE SET
-           observes = observes + 1,
-           cents = cents + CASE WHEN (observes + 1) % ?3 = 0 THEN 1 ELSE 0 END
-         WHERE cents + 1 <= ?2`,
-      )
-      .bind(day, maxCents, OBSERVES_PER_CENT)
-      .run();
-    if (all.meta.changes === 0) {
-      await this.db.prepare("UPDATE usage SET observes = observes - 1 WHERE day = ?1 AND device = ?2").bind(day, device).run();
-      return "global";
-    }
-    return "ok";
+    return row ? "ok" : "device";
   }
 }
 
@@ -153,7 +139,8 @@ export function checkObserve(usage: UsageStore, device: string, day: string): Pr
   return usage.tryObserve(day, device, DEVICE_DAILY_OBSERVES, GLOBAL_DAILY_CENTS);
 }
 
-/** What a call really cost, in cents, from Meta's own token counts (muse-spark-1.3 standard prices). */
-export function realCents(u: { input: number; cachedInput: number; output: number }): number {
-  return ((u.input - u.cachedInput) * 1.25 + u.cachedInput * 0.15 + u.output * 4.25) / 1e6 * 100;
+/** What a call really cost, in thousandths of a cent, from Meta's token counts (muse-spark-1.3 standard prices). */
+export function realMillicents(u: { input: number; cachedInput: number; output: number }): number {
+  // $/M tokens × 100 ¢ × 1000 m¢ / 1e6 tokens = rate / 10 millicents per token.
+  return Math.ceil(((u.input - u.cachedInput) * 1.25 + u.cachedInput * 0.15 + u.output * 4.25) / 10);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryUsageStore, checkAndCount, checkObserve, costOf, DEVICE_DAILY_OBSERVES, DEVICE_DAILY_TURNS, GLOBAL_DAILY_CENTS, LIMIT_LINE, LINK_CENTS } from "../src/limits";
+import { MemoryUsageStore, checkAndCount, checkObserve, costOf, realMillicents, DEVICE_DAILY_OBSERVES, DEVICE_DAILY_TURNS, GLOBAL_DAILY_CENTS, LIMIT_LINE, LINK_CENTS } from "../src/limits";
 import worker from "../src/index";
 import { MemorySessionStore } from "../src/session";
 import type { ModelConnector } from "../src/model/connector";
@@ -56,17 +56,16 @@ describe("checkObserve", () => {
     for (let i = 0; i < DEVICE_DAILY_OBSERVES; i++) expect(await checkObserve(u, "d1", day)).toBe("ok");
     expect(await checkObserve(u, "d1", day)).toBe("device");
   });
-  it("charges 1¢ to the global total every 3 observations (measured ~0.3¢ each)", async () => {
+  it("charges each look's real cost, and fractions of a cent add up", async () => {
     const u = new MemoryUsageStore();
-    for (let i = 0; i < 2; i++) await checkObserve(u, "d1", day);
-    expect(await u.totalCents(day)).toBe(0);
-    await checkObserve(u, "d1", day);
-    expect(await u.totalCents(day)).toBe(1);
+    for (let i = 0; i < 3; i++) await u.chargeMillicents(day, 400);   // 0.4¢ each
+    expect(await u.totalCents(day)).toBe(1);                          // 1.2¢ so far → 1 whole cent
+    await u.chargeMillicents(day, 900);                               // 2.1¢
+    expect(await u.totalCents(day)).toBe(2);
   });
-  it("counts the charge across all devices, so rotating device ids doesn't dodge it", async () => {
-    const u = new MemoryUsageStore();
-    for (let i = 0; i < 30; i++) await checkObserve(u, `dev-${i}`, day);   // one look per device
-    expect(await u.totalCents(day)).toBe(10);
+  it("realMillicents prices tokens at muse-spark-1.3 standard rates", () => {
+    // 1M input − 200k cached at $1.25/M + 200k cached at $0.15/M + 100k output at $4.25/M = $1.455 = 145.5¢
+    expect(realMillicents({ input: 1_000_000, cachedInput: 200_000, output: 100_000 })).toBe(145_500);
   });
   it("stops observing when the global cap is spent", async () => {
     const u = new MemoryUsageStore();

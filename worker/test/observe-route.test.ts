@@ -74,9 +74,11 @@ describe("POST /v1/observe", () => {
     await worker.handle(post(body), env, d);
     expect(await d.usage.totalCents("2026-10-27")).toBe(250);
   });
-  it("an ordinary look adds nothing beyond the flat charge", async () => {
-    const d = await deps();
+  it("ordinary looks are charged their real cost, fractions adding up across devices' looks", async () => {
+    const d = await deps(undefined, { input: 900, cachedInput: 0, output: 2_000 });   // 0.9725¢ a look
     await worker.handle(post(body), env, d);
     expect(await d.usage.totalCents("2026-10-27")).toBe(0);
+    await worker.handle(post(body), env, d);
+    expect(await d.usage.totalCents("2026-10-27")).toBe(1);
   });
 });
