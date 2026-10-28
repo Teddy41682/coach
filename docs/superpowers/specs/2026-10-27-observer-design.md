@@ -29,6 +29,23 @@ shake of a salt shaker is caught only if it happens to land in one of those fram
 5. **What it can't see, it asks about.** The briefing marks steps whose key action is hard to see (a pinch of salt);
    for those the coach confirms by asking rather than guessing.
 
+## Away and back — his end state (2026-10-27)
+
+*"The ideal state is that you just have this person essentially looking over your head that's able to keep track of
+where I'm at, what I'm doing, what needs to be done. I should be able to walk away, leave for an hour, come back and
+pick up right where we left off… you shouldn't just keep bugging me… and we shouldn't keep charging… when it's
+obvious I've moved on… I feel like someone's professional with me, working with me."*
+
+1. **Every look also says whether the cook is at the cooking** (`away: true` when the photo shows another room, a
+   desk, a screen, nothing of the dish).
+2. **Three away looks in a row → it says so once**, calmly — *"Looks like you've stepped away. I'll hold our place at
+   step 3 — come back when you're ready."* — and enters **away**: no turns, no interjections, and observing drops to
+   one glance every 30 s, only to notice the return.
+3. **Back** — a look that shows the cooking again, or the cook saying they're back — resumes with a recap from the
+   log: *"Welcome back — we were on step 3, mixing in the mayo; the tuna's in the bowl, the mayo hasn't gone in yet."*
+   Nothing is lost, after five minutes or an hour.
+4. **A timer is a planned absence**: the same away state, ended by the timer.
+
 ## Decided
 
 - **Cadence 2.5 s, one 640 px frame, `muse-spark-1.3` minimal, non-streaming.** One observation in flight at a time:
@@ -63,6 +80,7 @@ One recorded run, scrambled eggs, glasses only:
 | C | Pours eggs into a **cold pan** | it speaks up unprompted, or says so when asked |
 | D | Eggs half-cooked: "are these done?" | not yet |
 | E | Eggs done: "are these done?" | yes, and it moves on |
+| F | Walks out of the kitchen mid-step for a minute, then back | says it's holding the place once; quiet and cheap while away; picks up with a recap |
 
 Plus, read from the recording: seconds from the end of his words to the coach's first word on every turn, and
 the observer's cost per minute.
