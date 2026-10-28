@@ -70,10 +70,11 @@ Third-party apps can reach the glasses' camera only with Developer Mode on.
 - **Wearables Device Access Toolkit 1.0.1** — the glasses' camera stream.
 
 ### Safety and cost
-- The model key lives only in the Worker. The app authenticates with an app key; a session answers only the device
-  that started it.
+- The model key lives only in the Worker. The app authenticates with an app key, or with a short-lived token from
+  the host app (HMAC-signed with `COACH_TOKEN_SECRET`, audience `coach`, at most an hour; no secret set, no tokens).
+  A session answers only the device — or the token's subject — that started it.
 - Every model call reserves its worst-case cost before it runs and settles to the cost Meta reports, against
-  per-device and global daily caps. Images are strict JPEGs ≤ 1024 px.
+  per-device (per-subject, for tokens) and global daily caps. Images are strict JPEGs ≤ 1024 px.
 - Standard tier only — nothing is sent under the contributor terms.
 
 ## Repository

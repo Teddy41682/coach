@@ -13,11 +13,14 @@ import type { Completer } from "./model/connector";
 import { D1SessionStore, type SessionStore } from "./session";
 import { encodeEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
+import { verifyToken } from "./token";
 
 export interface Env {
   MODEL_API_KEY: string;
   /** The app's key: every request must carry it in `X-Coach-Key`, so the Meta credit is not an open proxy. */
   COACH_APP_KEY: string;
+  /** Shared with a host app that mints short-lived tokens (`token.ts`); unset, tokens are refused. */
+  COACH_TOKEN_SECRET?: string;
   DB?: D1Database;
 }
 
@@ -101,13 +104,23 @@ function sameKey(given: string | null, expected: string): boolean {
 
 const bad = (status: number, error: string) => Response.json({ error }, { status });
 
-/** Auth, size cap and JSON parse, shared by every POST route. Returns the parsed body or the refusal. */
-async function admit(request: Request, env: Env): Promise<{ body: unknown } | Response> {
-  if (!sameKey(request.headers.get("X-Coach-Key"), env.COACH_APP_KEY)) return bad(401, "unauthorised");
+/**
+ * Auth, size cap and JSON parse, shared by every POST route. Returns the parsed body and, for a token caller, the
+ * id its limits and sessions belong to (`sub:<sub>` — the colon keeps it apart from any device id); an app-key
+ * caller has none and is known by its device header.
+ */
+async function admit(request: Request, env: Env, nowMs: number): Promise<{ body: unknown; caller: string | null } | Response> {
+  const given = request.headers.get("X-Coach-Key");
+  let caller: string | null = null;
+  if (!sameKey(given, env.COACH_APP_KEY)) {
+    const sub = await verifyToken(given, env.COACH_TOKEN_SECRET, nowMs);
+    if (!sub) return bad(401, "unauthorised");
+    caller = `sub:${sub}`;
+  }
   if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) return bad(413, "too_large");
   const text = await readBounded(request, MAX_BODY_BYTES);
   if (text === null) return bad(413, "too_large");
-  try { return { body: JSON.parse(text) }; } catch { return { body: null }; }
+  try { return { body: JSON.parse(text), caller }; } catch { return { body: null, caller }; }
 }
 
 async function handle(request: Request, env: Env, deps: Deps): Promise<Response> {
@@ -115,9 +128,9 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
   if (request.method !== "POST") return bad(404, "not_found");
 
   if (url.pathname === "/v1/session") {
-    const got = await admit(request, env);
+    const got = await admit(request, env, deps.now());
     if (got instanceof Response) return got;
-    const device = deviceOf(request);
+    const device = got.caller ?? deviceOf(request);
     if (!device) return bad(400, "no_device");
     const recipe = (got.body as { recipe?: unknown } | null)?.recipe;
     if (!isRecipe(recipe)) return bad(400, "bad_recipe");
@@ -135,11 +148,11 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
   }
 
   if (url.pathname === "/v1/turn") {
-    const got = await admit(request, env);
+    const got = await admit(request, env, deps.now());
     if (got instanceof Response) return got;
     if (!isTurn(got.body)) return bad(400, "bad_request");
     const turn = got.body;
-    const device = deviceOf(request);
+    const device = got.caller ?? deviceOf(request);
     if (!device) return bad(400, "no_device");
     const session = await deps.store.get(turn.sessionId);
     if (!session) return bad(404, "unknown_session");
@@ -164,9 +177,9 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
   }
 
   if (url.pathname === "/v1/observe") {
-    const got = await admit(request, env);
+    const got = await admit(request, env, deps.now());
     if (got instanceof Response) return got;
-    const device = deviceOf(request);
+    const device = got.caller ?? deviceOf(request);
     if (!device) return bad(400, "no_device");
     const b = got.body as { sessionId?: unknown; stepIndex?: unknown; frame?: unknown; previous?: unknown; recent?: unknown } | null;
     const ok = !!b && str(b.sessionId, 100) && Number.isInteger(b.stepIndex) && (b.stepIndex as number) >= 0
@@ -194,9 +207,9 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
   }
 
   if (url.pathname === "/v1/mind") {
-    const got = await admit(request, env);
+    const got = await admit(request, env, deps.now());
     if (got instanceof Response) return got;
-    const device = deviceOf(request);
+    const device = got.caller ?? deviceOf(request);
     if (!device) return bad(400, "no_device");
     const m = got.body;
     // Every image the mind is shown is a strict JPEG ≤ 1024 px: Meta bills by pixels.
