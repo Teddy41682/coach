@@ -5,6 +5,10 @@
  */
 export const DEVICE_DAILY_TURNS = 150;
 export const GLOBAL_DAILY_CENTS = 1_500;
+/** Observations are counted apart from turns: ~1 hour of cooking at one every 2.5 s… */
+export const DEVICE_DAILY_OBSERVES = 1_500;
+/** …and every 10th charges 1¢ to the global total, so the overall ceiling still holds (~0.17¢ each, estimated). */
+export const OBSERVES_PER_CENT = 10;
 export const LIMIT_LINE = "I've reached today's limit — try again tomorrow.";
 /** Session start: planning reasons, then answers with up to 4,000 tokens (~1.7¢ at $4.25/M) plus the recipe; charged 3¢. */
 export const LINK_CENTS = 3;
@@ -26,6 +30,8 @@ export type CountResult = "ok" | "device" | "global";
 export interface UsageStore {
   tryAdd(day: string, device: string, cents: number, maxTurns: number, maxCents: number): Promise<CountResult>;
   totalCents(day: string): Promise<number>;
+  /** Counts one observation if the device is under `max` and the global total has room; atomic like `tryAdd`. */
+  tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult>;
 }
 
 /** For tests. Synchronous inside, so it is atomic in the same way the D1 statements are. */
@@ -41,6 +47,17 @@ export class MemoryUsageStore implements UsageStore {
     return "ok";
   }
   async totalCents(day: string) { return this.cents.get(day) ?? 0; }
+  private observes = new Map<string, number>();
+  async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
+    const k = `${day}|${device}`;
+    const n = this.observes.get(k) ?? 0;
+    if (n >= max) return "device";
+    const charge = (n + 1) % OBSERVES_PER_CENT === 0 ? 1 : 0;
+    if ((this.cents.get(day) ?? 0) + Math.max(charge, 1) > maxCents) return "global";
+    this.observes.set(k, n + 1);
+    if (charge) this.cents.set(day, (this.cents.get(day) ?? 0) + charge);
+    return "ok";
+  }
 }
 
 /**
@@ -74,6 +91,29 @@ export class D1UsageStore implements UsageStore {
     const r = await this.db.prepare("SELECT cents FROM usage WHERE day = ?1 AND device = '*'").bind(day).first<{ cents: number }>();
     return r?.cents ?? 0;
   }
+  async tryObserve(day: string, device: string, max: number, maxCents: number): Promise<CountResult> {
+    if ((await this.totalCents(day)) >= maxCents) return "global";
+    const row = await this.db
+      .prepare(
+        `INSERT INTO usage (day, device, turns, cents, observes) VALUES (?1, ?2, 0, 0, 1)
+         ON CONFLICT (day, device) DO UPDATE SET observes = observes + 1 WHERE observes < ?3
+         RETURNING observes`,
+      )
+      .bind(day, device, max)
+      .first<{ observes: number }>();
+    if (!row) return "device";
+    if (row.observes % OBSERVES_PER_CENT === 0) {
+      const all = await this.db
+        .prepare(
+          `INSERT INTO usage (day, device, turns, cents) VALUES (?1, '*', 0, 1)
+           ON CONFLICT (day, device) DO UPDATE SET cents = cents + 1 WHERE cents + 1 <= ?2`,
+        )
+        .bind(day, maxCents)
+        .run();
+      if (all.meta.changes === 0) return "global";
+    }
+    return "ok";
+  }
 }
 
 /** Counts the request if it may go ahead; a refused request is not counted. */
@@ -84,4 +124,8 @@ export function checkAndCount(usage: UsageStore, device: string, day: string, ce
 /** The cook's day: caps reset at midnight in Hawaii, where the coach is run from. */
 export function hstDay(nowMs: number): string {
   return new Date(nowMs - 10 * 3_600_000).toISOString().slice(0, 10);
+}
+
+export function checkObserve(usage: UsageStore, device: string, day: string): Promise<CountResult> {
+  return usage.tryObserve(day, device, DEVICE_DAILY_OBSERVES, GLOBAL_DAILY_CENTS);
 }

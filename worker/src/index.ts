@@ -3,7 +3,9 @@ import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
-import { checkAndCount, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
+import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
+import { observeFrame } from "./observe";
+import type { Completer } from "./model/connector";
 import { D1SessionStore, type SessionStore } from "./session";
 import { encodeEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
@@ -17,7 +19,7 @@ export interface Env {
 
 /** What the routes need from the world, so tests can swap the store and the model. */
 /** `link` answers are long JSON after the model has reasoned, so linking gets a bigger token allowance. */
-export type Purpose = "turn" | "link";
+export type Purpose = "turn" | "link" | "observe";
 export type Deps = { store: SessionStore; usage: UsageStore; model: (purpose: Purpose) => ModelConnector; now: () => number };
 /** Measured 2026-10-27: linking alone used 281 reasoning + ~90 answer tokens and 400 truncated it; briefings add ~60 tokens a step. */
 export const LINK_MAX_TOKENS = 4_000;
@@ -147,6 +149,30 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     return new Response(runTurn(turn, deps.model("turn"), { system: cooking.system(ctx), user: cooking.user(ctx) }), {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
     });
+  }
+
+  if (url.pathname === "/v1/observe") {
+    const got = await admit(request, env);
+    if (got instanceof Response) return got;
+    const device = deviceOf(request);
+    if (!device) return bad(400, "no_device");
+    const b = got.body as { sessionId?: unknown; stepIndex?: unknown; frame?: unknown; recent?: unknown } | null;
+    const ok = !!b && str(b.sessionId, 100) && Number.isInteger(b.stepIndex) && (b.stepIndex as number) >= 0
+      && str(b.frame, MAX_FRAME_CHARS) && BASE64.test(b.frame as string)
+      && Array.isArray(b.recent) && b.recent.length <= 10 && b.recent.every((l) => str(l, 100));
+    if (!ok || !b) return bad(400, "bad_request");
+    const session = await deps.store.get(b.sessionId as string);
+    if (!session) return bad(404, "unknown_session");
+    if ((await checkObserve(deps.usage, device, hstDay(deps.now()))) !== "ok") return bad(429, "daily_limit");
+    const stepIndex = b.stepIndex as number;
+    const plan = session.links[Math.min(stepIndex, Math.max(session.links.length - 1, 0))];
+    const model = deps.model("observe") as Partial<Completer>;
+    if (typeof model.complete !== "function") return bad(500, "no_completer");
+    const seen = await observeFrame(
+      { recipe: session.recipe, stepIndex, recent: b.recent as string[],
+        briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "" } },
+      b.frame as string, model as Completer);
+    return Response.json(seen);
   }
 
   return bad(404, "not_found");

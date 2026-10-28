@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryUsageStore, checkAndCount, costOf, DEVICE_DAILY_TURNS, GLOBAL_DAILY_CENTS, LIMIT_LINE, LINK_CENTS } from "../src/limits";
+import { MemoryUsageStore, checkAndCount, checkObserve, costOf, DEVICE_DAILY_OBSERVES, DEVICE_DAILY_TURNS, GLOBAL_DAILY_CENTS, LIMIT_LINE, LINK_CENTS } from "../src/limits";
 import worker from "../src/index";
 import { MemorySessionStore } from "../src/session";
 import type { ModelConnector } from "../src/model/connector";
@@ -47,6 +47,31 @@ describe("checkAndCount", () => {
     const u = new MemoryUsageStore();
     const results = await Promise.all(Array.from({ length: DEVICE_DAILY_TURNS + 40 }, () => checkAndCount(u, "d1", day, 1)));
     expect(results.filter((r) => r === "ok")).toHaveLength(DEVICE_DAILY_TURNS);
+  });
+});
+
+describe("checkObserve", () => {
+  it("lets a device observe until its own daily cap", async () => {
+    const u = new MemoryUsageStore();
+    for (let i = 0; i < DEVICE_DAILY_OBSERVES; i++) expect(await checkObserve(u, "d1", day)).toBe("ok");
+    expect(await checkObserve(u, "d1", day)).toBe("device");
+  });
+  it("charges 1¢ to the global total every 10 observations", async () => {
+    const u = new MemoryUsageStore();
+    for (let i = 0; i < 9; i++) await checkObserve(u, "d1", day);
+    expect(await u.totalCents(day)).toBe(0);
+    await checkObserve(u, "d1", day);
+    expect(await u.totalCents(day)).toBe(1);
+  });
+  it("stops observing when the global cap is spent", async () => {
+    const u = new MemoryUsageStore();
+    for (let i = 0; i < GLOBAL_DAILY_CENTS; i++) await checkAndCount(u, `dev-${i % 100}`, day, 1);
+    expect(await checkObserve(u, "fresh", day)).toBe("global");
+  });
+  it("observations don't use up the device's turns", async () => {
+    const u = new MemoryUsageStore();
+    for (let i = 0; i < 200; i++) await checkObserve(u, "d1", day);
+    expect(await checkAndCount(u, "d1", day, 1)).toBe("ok");
   });
 });
 

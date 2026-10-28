@@ -1,3 +1,4 @@
+import type { ObserveContext } from "../observe";
 import type { ExpertisePack, PackContext } from "./pack";
 
 const RULES = [
@@ -53,3 +54,27 @@ export const cooking: ExpertisePack = {
     return lines.join("\n");
   },
 };
+
+/** The observer's instructions: what's new in this one photo, conservatively, and speak up only for a clear mistake. */
+export function observerSystem(ctx: ObserveContext): string {
+  const { steps } = ctx.recipe;
+  const i = Math.min(Math.max(ctx.stepIndex, 0), Math.max(steps.length - 1, 0));
+  return [
+    "You watch someone cooking through their smart glasses, one photo every few seconds.",
+    "Report only what is NEW compared with the log: an ingredient added (use the recipe's names), a tool picked up, an action done (cracked, poured, stirred, chopped, flipped).",
+    "Be conservative: only what this photo clearly shows. Nothing new means no events.",
+    "Each event is a few words, past tense, e.g. \"shook salt over the bowl\".",
+    "If the photo shows a clear mistake against this step, put one short spoken sentence in interject (no more than 20 words); otherwise null. Never interject about nutrition or health.",
+    'Answer with JSON only: {"events": ["…"], "interject": null}',
+    "",
+    `Recipe: ${ctx.recipe.title}`,
+    `Ingredients: ${ctx.recipe.ingredients.map((g) => g.item).join(", ") || "none listed"}`,
+    steps.length ? `Step ${i + 1} of ${steps.length}: ${steps[i]}` : "No steps were given.",
+    ...(ctx.briefing.done ? [`Done when: ${ctx.briefing.done}`] : []),
+    ...(ctx.briefing.mistakes ? [`Common mistakes: ${ctx.briefing.mistakes}`] : []),
+  ].join("\n");
+}
+
+export function observerUser(ctx: ObserveContext): string {
+  return ctx.recent.length ? `Log so far:\n${ctx.recent.join("\n")}` : "Log so far: nothing yet.";
+}

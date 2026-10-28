@@ -1,4 +1,4 @@
-import type { ModelConnector, ModelRequest } from "./connector";
+import type { Completer, ModelConnector, ModelRequest, Usage } from "./connector";
 
 const URL_ = "https://api.meta.ai/v1/chat/completions";
 
@@ -7,7 +7,7 @@ const URL_ = "https://api.meta.ai/v1/chat/completions";
  * contributor tier lets Meta train on what we send (a kitchen, a home), so a contributor model is refused outright.
  * `minimal` effort because `low` measured empty answers at our token cap (outputs/2026-10-27-latency.md).
  */
-export class MuseConnector implements ModelConnector {
+export class MuseConnector implements ModelConnector, Completer {
   constructor(
     private readonly apiKey: string,
     private readonly model = "muse-spark-1.3",
@@ -20,27 +20,53 @@ export class MuseConnector implements ModelConnector {
     if (model.includes("contributor")) throw new Error(`${model}: Coach uses the standard tier only`);
   }
 
+  private body(req: ModelRequest, stream: boolean): string {
+    return JSON.stringify({
+      model: this.model,
+      stream,
+      reasoning_effort: this.effort,
+      max_completion_tokens: this.maxTokens,
+      messages: [
+        { role: "system", content: req.system },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: req.user },
+            ...req.images.map((b64) => ({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } })),
+          ],
+        },
+      ],
+    });
+  }
+
+  async complete(req: ModelRequest, signal?: AbortSignal): Promise<{ text: string; usage: Usage }> {
+    const res = await this.fetchImpl(URL_, {
+      method: "POST",
+      signal,
+      headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+      body: this.body(req, false),
+    });
+    if (!res.ok) throw new Error(`Muse Spark answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const d = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
+    };
+    return {
+      text: d.choices?.[0]?.message?.content ?? "",
+      usage: {
+        input: d.usage?.prompt_tokens ?? 0,
+        cachedInput: d.usage?.prompt_tokens_details?.cached_tokens ?? 0,
+        output: d.usage?.completion_tokens ?? 0,
+      },
+    };
+  }
+
   async *stream(req: ModelRequest, signal: AbortSignal): AsyncIterable<string> {
     const res = await this.fetchImpl(URL_, {
       method: "POST",
       signal,
       headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: this.model,
-        stream: true,
-        reasoning_effort: this.effort,
-        max_completion_tokens: this.maxTokens,
-        messages: [
-          { role: "system", content: req.system },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: req.user },
-              ...req.images.map((b64) => ({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } })),
-            ],
-          },
-        ],
-      }),
+      body: this.body(req, true),
     });
     if (!res.ok || !res.body) throw new Error(`Muse Spark answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
 
