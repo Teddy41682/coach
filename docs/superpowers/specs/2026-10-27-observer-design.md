@@ -39,7 +39,7 @@ obvious I've moved on… I feel like someone's professional with me, working wit
 1. **Every look also says whether the cook has left the kitchen** (`away: true` only for another room, outdoors, a
    car). On glasses the camera is wherever they look, so a glance at the phone, a screen or the sink is not away —
    his first try marked 9 of 9 looks away under the looser rule.
-2. **Away for a minute (3+ away looks spanning 60 s, none within 2 min of the cook speaking) → it says so once**,
+2. **Away for a minute (3+ away looks spanning 60 s since the cook last spoke — speaking restarts the minute) → it says so once**,
    at most once every 5 minutes, calmly — *"Looks like you've stepped away. I'll hold our place at
    step 3 — come back when you're ready."* — and enters **away**: no turns, no interjections, and observing drops to
    one glance every 30 s, only to notice the return.

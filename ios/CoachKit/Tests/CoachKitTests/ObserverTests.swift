@@ -176,13 +176,14 @@ import Testing
     #expect(await awayAt(rig, o, [100, 140]).allSatisfy { $0 == nil })
   }
 
-  @Test func talkingMeansTheyreHere() async {
+  @Test func speakingRestartsTheMinute() async {
     let rig = ObserverRig(); let o = rig.observer()
     _ = await awayAt(rig, o, [0, 20, 40])
     rig.now = 50; _ = o.returned(step: 0)
-    // Away looks for the next two minutes say nothing: they just spoke.
-    #expect(await awayAt(rig, o, [60, 90, 120, 150, 169]).allSatisfy { $0 == nil })
-    #expect(o.presence == .present)
+    // The minute starts again from the first away look after they spoke (60), not from 0…
+    #expect(await awayAt(rig, o, [60, 90, 110]).allSatisfy { $0 == nil })
+    // …and talking from another room doesn't block it for longer than that (his try, 2026-10-27).
+    #expect(await awayAt(rig, o, [120]).last == .away("Looks like you've stepped away. I'll hold our place at step 1 — come back when you're ready."))
   }
 
   @Test func neverSaysSteppedAwayTwiceWithinFiveMinutes() async {
