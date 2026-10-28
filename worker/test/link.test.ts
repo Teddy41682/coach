@@ -9,7 +9,7 @@ const recipe: CoachRecipe = {
   steps: ["Whisk the flour and salt.", "Beat in the eggs."],
 };
 const answering = (text: string): ModelConnector => ({ async *stream() { yield text.slice(0, 10); yield text.slice(10); } });
-const blank = { done: "", mistakes: "", tip: "" };
+const blank = { done: "", mistakes: "", tip: "", hardToSee: false };
 const everything = [{ ingredients: ["flour", "salt", "eggs"], ...blank }, { ingredients: ["flour", "salt", "eggs"], ...blank }];
 const plan = (steps: unknown) => answering(JSON.stringify({ steps }));
 
@@ -19,8 +19,12 @@ describe("linkSteps — ingredients and a briefing per step", () => {
       { ingredients: ["flour", "salt"], done: "No dry pockets.", mistakes: "Clumps at the bottom.", tip: "Whisk from the edge in." },
       { ingredients: ["eggs"], done: "Smooth batter.", mistakes: "Overmixing.", tip: "Stop when streaks vanish." },
     ]));
-    expect(r[0]).toEqual({ ingredients: ["flour", "salt"], done: "No dry pockets.", mistakes: "Clumps at the bottom.", tip: "Whisk from the edge in." });
+    expect(r[0]).toEqual({ ingredients: ["flour", "salt"], done: "No dry pockets.", mistakes: "Clumps at the bottom.", tip: "Whisk from the edge in.", hardToSee: false });
     expect(r[1].ingredients).toEqual(["eggs"]);
+  });
+  it("reads hardToSee, true only when the model says so", async () => {
+    const r = await linkSteps(recipe, plan([{ ingredients: ["salt"], hardToSee: true }, { ingredients: [], hardToSee: "yes" }]));
+    expect(r.map((s) => s.hardToSee)).toEqual([true, false]);
   });
   it("drops an item the recipe doesn't have", async () => {
     const r = await linkSteps(recipe, plan([{ ingredients: ["flour", "oregano"] }, { ingredients: ["eggs"] }]));

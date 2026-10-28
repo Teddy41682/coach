@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cooking } from "../src/expertise/cooking";
+import { cooking, observerSystem } from "../src/expertise/cooking";
 import type { PackContext } from "../src/expertise/pack";
 
 const ctx = (over: Partial<PackContext> = {}): PackContext => ({
@@ -38,7 +38,7 @@ describe("the cooking pack", () => {
   it("puts the question and what's been seen in the user turn", () => {
     const u = cooking.user(ctx());
     expect(u).toContain("Is this gel thick enough?");
-    expect(u).toContain("water, psyllium husk");
+    expect(u).toContain("Seen so far (watched continuously):\nwater\npsyllium husk");
   });
 
   it("still names the dish for a recipe with no steps", () => {
@@ -61,8 +61,22 @@ describe("the cooking pack", () => {
     expect(cooking.user(ctx({ hasPhotos: true }))).not.toContain("don't say an ingredient is missing");
   });
 
-  it("leaves out the 'noted so far' line when nothing has been noted", () => {
-    expect(cooking.user(ctx({ seen: [] }))).not.toContain("Noted going in");
+  it("leaves out the seen block when nothing has been seen", () => {
+    expect(cooking.user(ctx({ seen: [] }))).not.toContain("Seen so far");
+  });
+
+  it("shows the observer's log, with times, to every turn", () => {
+    const u = cooking.user(ctx({ seen: ["0:51 shook salt over the bowl", "1:05 started beating with a fork"] }));
+    expect(u).toContain("Seen so far (watched continuously):");
+    expect(u).toContain("0:51 shook salt over the bowl");
+  });
+
+  it("answers from the log, and asks when the log doesn't show it", () => {
+    expect(cooking.system(ctx())).toContain("If the log doesn't show an ingredient going in and you can't see it now, ask");
+  });
+
+  it("flags a step whose key action is hard to see", () => {
+    expect(cooking.system(ctx({ briefing: { done: "x", mistakes: "", tip: "", hardToSee: true } }))).toContain("hard to see");
   });
 
   it("lists the conversation so far, cook and coach", () => {
@@ -91,5 +105,11 @@ describe("the cooking pack", () => {
 
   it("leaves out an empty briefing", () => {
     expect(cooking.system(ctx({ briefing: { done: "", mistakes: "", tip: "" } }))).not.toContain("Done when:");
+  });
+
+  it("the observer reports nothing unless it's certain something new happened", () => {
+    const s = observerSystem({ recipe: ctx().recipe, stepIndex: 0, briefing: { done: "", mistakes: "", tip: "" }, recent: [] });
+    expect(s).toContain("If you are not certain it happened since the last log line, report nothing");
+    expect(s).toContain("Never repeat an event already in the log");
   });
 });

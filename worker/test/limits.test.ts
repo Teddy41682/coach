@@ -85,7 +85,7 @@ describe("a capped turn", () => {
     let called = false;
     const model: ModelConnector = { async *stream() { called = true; yield "x"; } };
     const store = new MemorySessionStore();
-    await store.put({ id: "s1", device: "d1", recipe: { title: "T", ingredients: [], steps: ["a"] }, links: [{ ingredients: [], done: "", mistakes: "", tip: "" }], createdAt: 0 });
+    await store.put({ id: "s1", device: "d1", recipe: { title: "T", ingredients: [], steps: ["a"] }, links: [{ ingredients: [], done: "", mistakes: "", tip: "", hardToSee: false }], createdAt: 0 });
     const usage = new MemoryUsageStore();
     for (let i = 0; i < DEVICE_DAILY_TURNS; i++) await checkAndCount(usage, "d1", day, 1);
     const deps = { store, usage, model: () => model, now: () => Date.parse("2026-10-27T20:00:00Z") };

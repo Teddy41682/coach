@@ -6,7 +6,7 @@ import { MemoryUsageStore, checkObserve, DEVICE_DAILY_OBSERVES } from "../src/li
 const env = { MODEL_API_KEY: "k", COACH_APP_KEY: "app" };
 const H = { "Content-Type": "application/json", "X-Coach-Key": "app", "X-Coach-Device": "d1" };
 const body = { sessionId: "s1", stepIndex: 0, frame: "QUFB", recent: ["0:12 cracked 2 eggs into the bowl"] };
-const plan = { ingredients: ["eggs"], done: "Smooth.", mistakes: "No salt.", tip: "" };
+const plan = { ingredients: ["eggs"], done: "Smooth.", mistakes: "No salt.", tip: "", hardToSee: false };
 
 async function deps(answer = '{"events":["shook salt over the bowl"],"interject":null}') {
   const store = new MemorySessionStore();

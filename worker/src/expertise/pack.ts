@@ -10,14 +10,14 @@ export type PackContext = {
   recipe: CoachRecipe;
   stepIndex: number;
   utterance: string;
-  /** What the coach has noted going in so far this step. */
+  /** The observer's log ("0:51 shook salt over the bowl"), newest last. */
   seen: string[];
   /** The ingredients that belong to the current step (step–ingredient linking). */
   stepIngredients: string[];
   /** Whether frames came with this question; without them the coach must not describe what it "sees". */
   hasPhotos: boolean;
   /** How to judge the current step, written when the session started (empty strings when planning failed). */
-  briefing: { done: string; mistakes: string; tip: string };
+  briefing: { done: string; mistakes: string; tip: string; hardToSee?: boolean };
   /** The conversation so far, oldest first. */
   history: { who: "cook" | "coach"; text: string }[];
 };

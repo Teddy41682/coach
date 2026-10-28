@@ -7,18 +7,19 @@ const SYSTEM = [
   "what 'done' looks like for that step, as something you could judge by looking (done);",
   "the common mistakes at that step (mistakes); and one short expert tip that isn't already in the recipe (tip).",
   "Each of done, mistakes and tip is one short sentence, spoken-style.",
-  'Answer with JSON only, in this shape: {"steps": [{"ingredients": ["item"], "done": "…", "mistakes": "…", "tip": "…"}, …]} — one object per step, in step order.',
+  "hardToSee: true if the step's key action can't be judged from a photo (a pinch of salt, a splash of vanilla), otherwise false.",
+  'Answer with JSON only, in this shape: {"steps": [{"ingredients": ["item"], "done": "…", "mistakes": "…", "tip": "…", "hardToSee": false}, …]} — one object per step, in step order.',
 ].join("\n");
 
 /** What the coach knows about one step before the cook starts: what goes in, and how to judge it. */
-export type StepPlan = { ingredients: string[]; done: string; mistakes: string; tip: string };
+export type StepPlan = { ingredients: string[]; done: string; mistakes: string; tip: string; hardToSee: boolean };
 
 const FIELD_MAX = 300;
 const field = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, FIELD_MAX) : "");
 
 /** Every ingredient on every step, no briefing: what the coach falls back to when planning fails, so cooking still works. */
 function everything(recipe: CoachRecipe): StepPlan[] {
-  return recipe.steps.map(() => ({ ingredients: recipe.ingredients.map((i) => i.item), done: "", mistakes: "", tip: "" }));
+  return recipe.steps.map(() => ({ ingredients: recipe.ingredients.map((i) => i.item), done: "", mistakes: "", tip: "", hardToSee: false }));
 }
 
 /**
@@ -50,7 +51,7 @@ export async function linkSteps(recipe: CoachRecipe, model: ModelConnector): Pro
       const items = Array.isArray(o.ingredients) ? o.ingredients : [];
       return {
         ingredients: items.filter((x): x is string => typeof x === "string" && known.has(x)),
-        done: field(o.done), mistakes: field(o.mistakes), tip: field(o.tip),
+        done: field(o.done), mistakes: field(o.mistakes), tip: field(o.tip), hardToSee: o.hardToSee === true,
       };
     });
   } catch (error) {

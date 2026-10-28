@@ -13,6 +13,7 @@ const RULES = [
   "If the cook asks to move on, move on — at most one short caution, never a refusal.",
   "End every answer with [[next]] or [[stay]] on its own line: [[next]] when the step is done or the cook wants to move on, otherwise [[stay]]. It is never read aloud.",
   "Before the cook moves on, say if an ingredient for this step looks missing.",
+  "The log under \"Seen so far\" was watched continuously: answer from it (\"yes, you added the salt at 0:51\"). If the log doesn't show an ingredient going in and you can't see it now, ask rather than guess.",
   "When you know a technique that would help, offer it as a tip, never as a change to the recipe.",
   "For doneness of meat, poultry or fish, give your cooking judgement and suggest a thermometer; never say food is safe to eat.",
   "Never give nutrition, calorie, health or medical advice.",
@@ -40,6 +41,7 @@ export const cooking: ExpertisePack = {
       ...(ctx.briefing.done ? [`Done when: ${ctx.briefing.done}`] : []),
       ...(ctx.briefing.mistakes ? [`Common mistakes: ${ctx.briefing.mistakes}`] : []),
       ...(ctx.briefing.tip ? [`A tip you may offer once: ${ctx.briefing.tip}`] : []),
+      ...(ctx.briefing.hardToSee ? ["This step's key action is hard to see in a photo: confirm it by asking, don't guess."] : []),
     ].join("\n");
   },
   user(ctx) {
@@ -48,7 +50,7 @@ export const cooking: ExpertisePack = {
       lines.push("Conversation so far:", ...ctx.history.map((l) => `${l.who === "cook" ? "Cook" : "Coach"}: ${l.text}`), "");
     }
     lines.push(`Cook: ${ctx.utterance}`);
-    if (ctx.seen.length > 0) lines.push(`(Noted going in so far this step: ${ctx.seen.join(", ")}.)`);
+    if (ctx.seen.length > 0) lines.push("Seen so far (watched continuously):", ...ctx.seen, "");
     // Without photos there is nothing to judge, so "nothing noted" must not read as "missing".
     if (!ctx.hasPhotos) lines.push("(No photo came with this question: answer from the recipe, don't describe what you see, and don't say an ingredient is missing.)");
     return lines.join("\n");
@@ -62,7 +64,7 @@ export function observerSystem(ctx: ObserveContext): string {
   return [
     "You watch someone cooking through their smart glasses, one photo every few seconds.",
     "Report only what is NEW compared with the log: an ingredient added (use the recipe's names), a tool picked up, an action done (cracked, poured, stirred, chopped, flipped).",
-    "Be conservative: only what this photo clearly shows. Nothing new means no events.",
+    "Be conservative: only what this photo clearly shows. If you are not certain it happened since the last log line, report nothing. Never repeat an event already in the log, and never report what you only infer.",
     "Each event is a few words, past tense, e.g. \"shook salt over the bowl\".",
     "If the photo shows a clear mistake against this step, put one short spoken sentence in interject (no more than 20 words); otherwise null. Never interject about nutrition or health.",
     'Answer with JSON only: {"events": ["…"], "interject": null}',

@@ -44,5 +44,7 @@ export class D1SessionStore implements SessionStore {
 /** Sessions stored before briefings held plain ingredient lists per step. */
 function upgrade(links: unknown): StepPlan[] {
   if (!Array.isArray(links)) return [];
-  return links.map((l) => (Array.isArray(l) ? { ingredients: l as string[], done: "", mistakes: "", tip: "" } : (l as StepPlan)));
+  return links.map((l) => (Array.isArray(l)
+    ? { ingredients: l as string[], done: "", mistakes: "", tip: "", hardToSee: false }
+    : { ...(l as StepPlan), hardToSee: (l as Partial<StepPlan>).hardToSee === true }));
 }

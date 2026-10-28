@@ -118,8 +118,8 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     return Response.json({
       sessionId: id,
       steps: recipe.steps.map((text, index) => {
-        const p = links[index] ?? { ingredients: [], done: "", mistakes: "", tip: "" };
-        return { index, text, ingredients: p.ingredients, briefing: { done: p.done, mistakes: p.mistakes, tip: p.tip } };
+        const p = links[index] ?? { ingredients: [], done: "", mistakes: "", tip: "", hardToSee: false };
+        return { index, text, ingredients: p.ingredients, briefing: { done: p.done, mistakes: p.mistakes, tip: p.tip, hardToSee: p.hardToSee } };
       }),
     });
   }
@@ -144,7 +144,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const ctx = {
       recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
       stepIngredients: plan?.ingredients ?? [],
-      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "" },
+      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "", hardToSee: plan?.hardToSee ?? false },
       hasPhotos: turn.frames.length > 0,
       history: turn.history ?? [],
     };
