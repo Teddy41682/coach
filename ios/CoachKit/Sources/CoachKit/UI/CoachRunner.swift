@@ -16,7 +16,7 @@ public final class CoachRunner {
   public private(set) var deviceNote = ""
   /// Seconds from the end of the cook's words to the coach's first spoken line, for the latest turn.
   public private(set) var lastResponse: TimeInterval?
-  /// What the observer's looks have really cost this cook, and how many there were.
+  /// What the mind's eye wakes have really cost this cook, and how many there were (names kept from the observer).
   public private(set) var observeCents = 0.0
   public private(set) var looks = 0
   /// True while the cook has stepped away and the place is held.
@@ -30,7 +30,7 @@ public final class CoachRunner {
   private var session: CoachSession?
   private var heardAt: Date?
   private var watcher: Task<Void, Never>?
-  private var observer: Observer?
+  private var mind: Mind?
   private var observing: Task<Void, Never>?
   private var routes: Task<Void, Never>?
   private var lastLoggedStep = 0
@@ -48,7 +48,14 @@ public final class CoachRunner {
     if let t = heardAt { lastResponse = Date().timeIntervalSince(t); heardAt = nil }
     activity = .speaking
     recorder?.note(.said(line))
+    mind?.note(.coach, line)
     speaker.say(line)
+  }
+
+  /// The newest frame and its thumbnail, for the eyes.
+  private func newest() -> (jpeg: Data, thumb: Thumb)? {
+    guard let jpeg = device.recent(1).last, let thumb = Thumb.of(jpeg: jpeg) else { return nil }
+    return (jpeg, thumb)
   }
 
   public func start() async {
@@ -56,9 +63,26 @@ public final class CoachRunner {
       if let recorder { device.onFrame = { recorder.frame($0, at: $1) }; recorder.note(.note("start: \(recipe.title)")) }
       try await device.start()
       let (sessionId, steps) = try await client.start(recipe)
+      let mind = Mind(
+        sessionId: sessionId, start: Date(),
+        call: { [client] in try await client.mind($0) },
+        frame: { [weak self] in self?.newest() })
+      mind.onWake = { [weak self, weak mind, recorder] reason, answer in
+        recorder?.note(.wake(reason, answer))
+        guard let self, let mind else { return }
+        self.observeCents = mind.cents; self.looks = mind.wakes; self.away = mind.held
+      }
+      self.mind = mind
       let session = CoachSession(
         recipe: recipe, sessionId: sessionId, steps: steps,
-        send: { [client] in client.turn($0) },
+        // The cook's words wake the same mind, streamed: the timeline (their words already in it) and the frames.
+        send: { [client, weak mind, weak self] turn in
+          var req = MindRequest(sessionId: turn.sessionId, stepIndex: turn.stepIndex, wake: .spoke,
+                                timeline: mind?.timeline.lines() ?? [], quietFor: 0)
+          req.utterance = turn.utterance; req.frames = turn.frames
+          req.finished = self?.session?.phase == .finished
+          return client.mindTurn(req)
+        },
         say: { [weak self] in self?.say($0) },
         frames: { [device] need in
           let jpegs: [Data]
@@ -66,21 +90,16 @@ public final class CoachRunner {
           case .acrossStep(let since): jpegs = device.across(since: since, max: 6)
           case .recent: jpegs = device.recent(2)
           }
-          return jpegs.map { $0.base64EncodedString() }
+          // Shown as the eye wakes are: ≤ 640 px (billed by pixels; the Worker refuses over 1024).
+          return jpegs.compactMap { downscaleJPEG($0)?.base64EncodedString() }
         },
-        seen: { [weak self] in self?.observer?.log.forTurn() ?? [] },
         schedule: { secs, fire in Task { @MainActor in try? await Task.sleep(for: .seconds(secs)); fire() } })
       self.session = session
-      let observer = Observer(
-        sessionId: sessionId, steps: steps, start: Date(),
-        observe: { [client] in try await client.observe($0) },
-        frame: { [device] in device.recent(1).last.flatMap { downscaleJPEG($0) }?.base64EncodedString() })
-      observer.onLook = { [weak self, weak observer, recorder] r in
-        recorder?.note(.seen(r.events, away: r.away, usage: r.usage))
-        guard let self, let observer else { return }
-        self.observeCents = observer.cents; self.looks = observer.looks
+      session.onHold = { [weak self, weak mind, weak session] in
+        guard let mind, let session else { return }
+        mind.holdPlace(step: session.stepIndex); self?.away = true
       }
-      self.observer = observer
+      session.onTimerEnded = { [weak mind] in mind?.wakeNow(.timer) }
       let listener = Listener(speaker: speaker)
       self.listener = listener
       listener.record(into: recorder?.mic)
@@ -89,17 +108,16 @@ public final class CoachRunner {
       say("Let's make \(recipe.title). Step 1: \(steps.first?.text ?? "")")
       refresh()
       watchDevice()
-      observe(session, observer)
+      watch(session, mind)
       for await words in listener.utterances {
         lastHeard = words
         recorder?.note(.heard(words))
         heardAt = Date()
         let intent = parseIntent(words)
-        // Speaking means they're back: pick up where we were before answering.
-        if let recap = observer.returned(step: session.stepIndex) {
-          away = false; say(recap); session.noteCoach(recap)
-          if intent == .back { refresh(); continue }
-        }
+        // Speaking means they're here; their words join the timeline the mind is woken with.
+        if intent != .ignore { mind.note(.cook, words) }
+        mind.cookSpoke(at: Date(), showing: newest()?.thumb)
+        away = mind.held
         activity = .thinking
         await session.handle(intent)
         refresh()
@@ -132,22 +150,23 @@ public final class CoachRunner {
     if stepNumber != lastLoggedStep { recorder?.note(.step(stepNumber, stepText)); lastLoggedStep = stepNumber }
   }
 
-  /// The observer, beside the conversation: it decides its own cadence; this just asks it often and says what it
-  /// returns. Paused while a timer runs and once the recipe is finished; busy while anyone is talking or thinking.
-  private func observe(_ session: CoachSession, _ observer: Observer) {
+  /// The eyes, beside the conversation: twice a second the newest frame goes to the mind's eyes, which wake it only
+  /// when something happened; whatever it decides passes the guardrails and is said here. A spoken turn in flight
+  /// (thinking) is the one call in flight; nothing is woken once the recipe is finished.
+  private func watch(_ session: CoachSession, _ mind: Mind) {
     observing = Task { [weak self] in
       while !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(500))
         guard !Task.isCancelled, let self, !self.stopped else { return }
-        let output = await observer.tick(step: session.stepIndex, paused: session.phase != .cooking) {
-          (session.stepIndex, self.speaker.isSpeaking || self.activity == .thinking)
+        let outcome = await mind.tick {
+          Mind.Now(step: session.stepIndex, finished: session.phase == .finished,
+                   cookSpeaking: self.listener?.isHearing ?? false, coachSpeaking: self.speaker.isSpeaking,
+                   turnActive: self.activity == .thinking)
         }
-        guard let output, !self.stopped else { continue }
-        switch output {
-        case .interject(let line): self.say(line); session.noteCoach(line)
-        case .away(let line): self.away = true; self.say(line); session.noteCoach(line)
-        case .back(let line): self.away = false; self.say(line); session.noteCoach(line)
-        }
+        self.away = mind.held
+        guard let outcome, !self.stopped else { continue }
+        if let line = outcome.say { self.say(line); session.noteCoach(line) }
+        if outcome.step == .next { await session.handle(.next); self.refresh() }
       }
     }
   }

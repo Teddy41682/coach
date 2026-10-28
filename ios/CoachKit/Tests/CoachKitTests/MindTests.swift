@@ -132,6 +132,13 @@ import Testing
     rig.gate?.resume(); _ = await first.value
   }
 
+  @Test func noEyeWakeWhileASpokenTurnIsInFlight() async {
+    let rig = MindRig(); let m = rig.mind()
+    rig.state.turnActive = true
+    _ = await rig.tick(m, at: 1)
+    #expect(rig.sent.isEmpty)
+  }
+
   @Test func nothingUnpromptedOnceFinished() async {
     let rig = MindRig(); let m = rig.mind()
     rig.state.finished = true

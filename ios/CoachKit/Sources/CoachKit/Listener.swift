@@ -36,6 +36,9 @@ public final class Listener {
   private var endpointer = Endpointer()
   private var ticker: Timer?
 
+  /// True while the cook is mid-sentence.
+  public var isHearing: Bool { endpointer.isHearing }
+
   /// While set, the microphone is also written to the recording.
   func record(into mic: MicFile?) { box.recording = mic }
 

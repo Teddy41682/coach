@@ -7,7 +7,7 @@ public struct RecordingLog: Sendable {
     case said(String)           // what the coach said
     case step(Int, String)      // a step began (1-based)
     case note(String)           // device and other happenings
-    case seen([String], away: Bool, usage: ObserveUsage)   // one observer look: what was new, and what it cost
+    case wake(WakeReason, MindAnswer)   // one eye wake of the mind: why, what it saw, said and decided, and its cost
   }
 
   public let start: Date
@@ -24,9 +24,9 @@ public struct RecordingLog: Sendable {
     case .said(let s): o["kind"] = "said"; o["text"] = s
     case .step(let n, let s): o["kind"] = "step"; o["step"] = n; o["text"] = s
     case .note(let s): o["kind"] = "note"; o["text"] = s
-    case .seen(let events, let away, let u):
-      o["kind"] = "seen"; o["events"] = events; o["away"] = away
-      o["input"] = u.input; o["cachedInput"] = u.cachedInput; o["output"] = u.output; o["cents"] = u.cents
+    case .wake(let reason, let a):
+      o["kind"] = "wake"; o["reason"] = reason.rawValue; o["seen"] = a.seen; o["say"] = a.say ?? NSNull(); o["step"] = a.step.rawValue
+      o["input"] = a.usage.input; o["cachedInput"] = a.usage.cachedInput; o["output"] = a.usage.output; o["cents"] = a.usage.cents
     }
     let data = (try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys])) ?? Data()
     let line = String(decoding: data, as: UTF8.self)

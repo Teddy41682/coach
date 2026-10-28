@@ -63,6 +63,26 @@ import Testing
     #expect(rig.turns.last?.history?.first == HistoryLine(who: .coach, text: "The pan's still cold."))
   }
 
+  @Test func aHoldDecisionKeepsTheStepAndTellsTheRunner() async {
+    let rig = Rig(); let s = rig.session()
+    rig.reply = [.text("I'll hold our place."), .action(.hold), .done]
+    var held = false
+    s.onHold = { held = true }
+    await s.handle(.question("back in ten, getting the door"))
+    #expect(held)
+    #expect(s.stepIndex == 0)
+    #expect(rig.said == ["I'll hold our place."])
+  }
+
+  @Test func aTimerEndingIsReported() async {
+    let rig = Rig(); let s = rig.session()
+    var ended = 0
+    s.onTimerEnded = { ended += 1 }
+    await s.handle(.setTimer(seconds: 60))
+    rig.advance(60)
+    #expect(ended == 1)
+  }
+
   @Test func nextSpeaksTheNextStepWithoutTheNetwork() async {
     let rig = Rig(); let s = rig.session()
     await s.handle(.next)

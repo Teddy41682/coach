@@ -59,6 +59,11 @@ public final class CoachSession {
     self.now = now; self.stepStartedAt = now()
   }
 
+  /// The coach judged the cook has stepped away (a spoken answer ending `[[hold]]`): the place is held.
+  public var onHold: (() -> Void)?
+  /// A timer the cook set has ended — the mind is woken to look.
+  public var onTimerEnded: (() -> Void)?
+
   /// Something the coach said outside a turn (the observer speaking up, holding the place), so turns build on it.
   public func noteCoach(_ line: String) { remember(.coach, line) }
 
@@ -103,6 +108,7 @@ public final class CoachSession {
       schedule(Double(seconds)) { [weak self] in
         guard let self else { return }
         self.phase = .cooking
+        self.onTimerEnded?()
         self.say("Your \(Self.describe(seconds, adjective: true)) timer is up — let's check.")
       }
     }
@@ -158,6 +164,7 @@ public final class CoachSession {
     }
     remember(.coach, spoken.joined(separator: " "))
     if decision == .next { advance() }
+    if decision == .hold { onHold?() }
   }
 
   static let lostLine = "Sorry, I lost that — ask me again."

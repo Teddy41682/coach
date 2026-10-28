@@ -12,8 +12,11 @@ public final class Mind {
     public var finished: Bool
     public var cookSpeaking: Bool
     public var coachSpeaking: Bool
-    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool) {
+    /// A spoken turn is in flight: it is the one call in flight, so the eyes wait.
+    public var turnActive: Bool
+    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool, turnActive: Bool = false) {
       self.step = step; self.finished = finished; self.cookSpeaking = cookSpeaking; self.coachSpeaking = coachSpeaking
+      self.turnActive = turnActive
     }
   }
   /// What to do with an answer: say this (if anything), then this with the step.
@@ -85,7 +88,7 @@ public final class Mind {
   public func tick(_ state: () -> Now) async -> Outcome? {
     var s = state()
     if s.coachSpeaking || s.cookSpeaking { lastSpeech = now() }
-    if stopped || s.finished || inFlight { return nil }
+    if stopped || s.finished || inFlight || s.turnActive { return nil }
     guard let f = frame() else { return nil }
     let t = now()
     let seenReason = eyes.look(f.thumb, at: t, busy: false)

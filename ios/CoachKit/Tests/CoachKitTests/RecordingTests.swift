@@ -20,14 +20,17 @@ import Testing
     #expect(third["step"] as? Int == 2)
   }
 
-  @Test func aLookIsRecordedWithWhatItSawAndWhatItCost() throws {
+  @Test func aWakeIsRecordedWithWhyWhatItSawSaidDecidedAndCost() throws {
     var log = RecordingLog(start: t0)
-    log.add(.seen(["shook salt over the bowl"], away: false, usage: ObserveUsage(input: 500, cachedInput: 0, output: 300)),
+    log.add(.wake(.changed, MindAnswer(seen: ["put two slices in"], say: "Toaster's on.", step: .next,
+                                       usage: ObserveUsage(input: 500, cachedInput: 0, output: 300))),
             at: t0.addingTimeInterval(51))
     let o = try JSONSerialization.jsonObject(with: Data(log.jsonLines().utf8)) as! [String: Any]
-    #expect(o["kind"] as? String == "seen")
-    #expect(o["events"] as? [String] == ["shook salt over the bowl"])
-    #expect(o["away"] as? Bool == false)
+    #expect(o["kind"] as? String == "wake")
+    #expect(o["reason"] as? String == "changed")
+    #expect(o["seen"] as? [String] == ["put two slices in"])
+    #expect(o["say"] as? String == "Toaster's on.")
+    #expect(o["step"] as? String == "next")
     #expect(o["output"] as? Int == 300)
     #expect(abs((o["cents"] as? Double ?? 0) - 0.19) < 0.0001)
   }

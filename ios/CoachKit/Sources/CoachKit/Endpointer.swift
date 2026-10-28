@@ -12,6 +12,9 @@ public struct Endpointer: Sendable {
 
   public init() {}
 
+  /// True while the cook is mid-sentence (words heard, not yet finished) — the coach must not talk over them.
+  public var isHearing: Bool { lastHeard != nil }
+
   public mutating func coachStopped(at date: Date) { coachStoppedAt = date }
 
   public mutating func heard(_ text: String, at date: Date, coachTalking: Bool) {

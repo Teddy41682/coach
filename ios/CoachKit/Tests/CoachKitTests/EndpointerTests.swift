@@ -35,4 +35,13 @@ import Testing
     e.heard("   ", at: at(0), coachTalking: false)
     #expect(e.tick(at: at(2)) == nil)
   }
+
+  @Test func isHearingWhileTheCookIsMidSentence() {
+    var e = Endpointer()
+    #expect(!e.isHearing)
+    e.heard("how much", at: at(1), coachTalking: false)
+    #expect(e.isHearing)
+    _ = e.tick(at: at(2.2))
+    #expect(!e.isHearing)
+  }
 }
