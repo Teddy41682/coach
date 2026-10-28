@@ -1,4 +1,5 @@
 #if os(iOS)
+import AVFoundation
 import Foundation
 import Observation
 
@@ -31,6 +32,7 @@ public final class CoachRunner {
   private var watcher: Task<Void, Never>?
   private var observer: Observer?
   private var observing: Task<Void, Never>?
+  private var routes: Task<Void, Never>?
   private var lastLoggedStep = 0
   /// Set when this session is being recorded.
   public let recorder: SessionRecorder?
@@ -83,6 +85,7 @@ public final class CoachRunner {
       self.listener = listener
       listener.record(into: recorder?.mic)
       try await listener.start()
+      watchAudioRoute()
       say("Let's make \(recipe.title). Step 1: \(steps.first?.text ?? "")")
       refresh()
       watchDevice()
@@ -113,6 +116,7 @@ public final class CoachRunner {
     stopped = true
     watcher?.cancel()
     observing?.cancel()
+    routes?.cancel()
     listener?.stop()
     speaker.stop()
     device.stop()
@@ -146,6 +150,25 @@ public final class CoachRunner {
         }
       }
     }
+  }
+
+  /// Notes where the voice is going (glasses, phone speaker…) at the start and on every change, so a recording
+  /// shows why the coach was heard from the phone (his try, 2026-10-27 — the cause wasn't recorded).
+  private func watchAudioRoute() {
+    recorder?.note(.note("audio: \(Self.route())"))
+    routes = Task { [weak self] in
+      for await _ in NotificationCenter.default.notifications(named: AVAudioSession.routeChangeNotification) {
+        guard let self, !Task.isCancelled else { return }
+        self.recorder?.note(.note("audio: \(Self.route())"))
+      }
+    }
+  }
+
+  private static func route() -> String {
+    let r = AVAudioSession.sharedInstance().currentRoute
+    let out = r.outputs.map { "\($0.portType.rawValue) \"\($0.portName)\"" }.joined(separator: ", ")
+    let input = r.inputs.map { "\($0.portType.rawValue) \"\($0.portName)\"" }.joined(separator: ", ")
+    return "out \(out.isEmpty ? "none" : out) · in \(input.isEmpty ? "none" : input)"
   }
 
   /// Says it out loud when the glasses fold, pause or drop, and when they're back.

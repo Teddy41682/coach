@@ -36,12 +36,14 @@ where I'm at, what I'm doing, what needs to be done. I should be able to walk aw
 pick up right where we left off… you shouldn't just keep bugging me… and we shouldn't keep charging… when it's
 obvious I've moved on… I feel like someone's professional with me, working with me."*
 
-1. **Every look also says whether the cook is at the cooking** (`away: true` when the photo shows another room, a
-   desk, a screen, nothing of the dish).
-2. **Three away looks in a row → it says so once**, calmly — *"Looks like you've stepped away. I'll hold our place at
+1. **Every look also says whether the cook has left the kitchen** (`away: true` only for another room, outdoors, a
+   car). On glasses the camera is wherever they look, so a glance at the phone, a screen or the sink is not away —
+   his first try marked 9 of 9 looks away under the looser rule.
+2. **Away for a minute (3+ away looks spanning 60 s, none within 2 min of the cook speaking) → it says so once**,
+   at most once every 5 minutes, calmly — *"Looks like you've stepped away. I'll hold our place at
    step 3 — come back when you're ready."* — and enters **away**: no turns, no interjections, and observing drops to
    one glance every 30 s, only to notice the return.
-3. **Back** — a look that shows the cooking again, or the cook saying they're back — resumes with a recap from the
+3. **Back** — two looks in a row that show the cooking again, or the cook saying they're back — resumes with a recap from the
    log: *"Welcome back — we were on step 3, mixing in the mayo; the tuna's in the bowl, the mayo hasn't gone in yet."*
    Nothing is lost, after five minutes or an hour.
 4. **A timer is a planned absence**: the same away state, ended by the timer.
@@ -67,6 +69,10 @@ obvious I've moved on… I feel like someone's professional with me, working wit
 
 - **Cost.** His call, 2026-10-27: build the observer as designed first, then take cost up as its own discussion —
   ~4¢ a minute (estimate) is "way too much" for a product (a 20-minute cook ≈ 80¢; five cooks a week ≈ $16/month).
+  **His direction (2026-10-27):** *"the glasses are just streaming live data and it's going to some brain… using AI
+  as little as possible is probably ideal… that brain processes it and then just knows the right times to talk."*
+  So the shape to design toward: cheap on-device processing of the whole stream (change detection, presence, motion)
+  decides *when* something worth asking about happened, and only then calls the model.
   Levers to weigh then: only observe when the frame changes (on-device diff), cache-friendly prompts (Meta's cached
   input is 8× cheaper), smaller frames, a cheaper open-weight model for observing only. To make that discussion
   rest on facts, every observation records the model's real token usage, and the recording reports ¢/minute.
