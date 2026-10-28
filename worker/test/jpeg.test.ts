@@ -13,4 +13,13 @@ describe("jpegSize", () => {
   it("reads a progressive JPEG too", () => expect(jpegSize(header(504, 896, 0xc2))).toEqual({ width: 504, height: 896 }));
   it("is null for something that isn't a JPEG", () => expect(jpegSize(btoa("not a jpeg at all"))).toBeNull());
   it("is null for a truncated header", () => expect(jpegSize(header(640, 360).slice(0, 8))).toBeNull());
+  it("is null for a zero width or height", () => expect(jpegSize(header(0, 360))).toBeNull());
+  it("is null when a second size header follows (a parser could read either)", () => {
+    const two = atob(header(640, 360)) + atob(header(4000, 3000)).slice(2);
+    expect(jpegSize(btoa(two))).toBeNull();
+  });
+  it("stops at the start of image data", () => {
+    const sos = String.fromCharCode(0xff, 0xda, 0x00, 0x02) + "\xff\xc0garbage";
+    expect(jpegSize(btoa(atob(header(640, 360)) + sos))).toEqual({ width: 640, height: 360 });
+  });
 });
