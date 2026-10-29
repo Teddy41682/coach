@@ -115,7 +115,8 @@ public final class CoachRunner {
         mind.holdPlace(step: session.stepIndex); self?.away = true
       }
       session.onTimerEnded = { [weak mind] in mind?.wakeNow(.timer) }
-      let listener = Listener(speaker: speaker)
+      let listener = Listener(speaker: speaker, client: client)
+      listener.onNote = { [recorder] in recorder?.note(.note($0)) }
       self.listener = listener
       listener.record(into: recorder?.mic)
       try await listener.start()

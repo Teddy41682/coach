@@ -123,6 +123,37 @@ public struct CoachClient: Sendable {
     return try JSONDecoder().decode(ObserveResult.self, from: data)
   }
 
+  /// The cook's microphone to Muse Voice Transcribe, through the Worker's `/v1/listen`: a socket Muse has accepted,
+  /// or a throw. A 401 on the handshake fetches a fresh key once, as every other call does.
+  public func listen(timeout: TimeInterval = 4) async throws -> URLSessionWebSocketTask {
+    let (task, status) = try await keyed { k in try await openListen(key: k, timeout: timeout) }
+    guard let task else { throw Refused(status: status) }
+    return task
+  }
+
+  private func openListen(key: String, timeout: TimeInterval) async throws -> (URLSessionWebSocketTask?, Int) {
+    var c = URLComponents(url: base.appending(path: "v1/listen"), resolvingAgainstBaseURL: false)!
+    c.scheme = c.scheme == "http" ? "ws" : "wss"
+    var r = URLRequest(url: c.url!)
+    r.setValue(key, forHTTPHeaderField: "X-Coach-Key")
+    r.setValue(device, forHTTPHeaderField: "X-Coach-Device")
+    let task = urls.webSocketTask(with: r)
+    task.resume()
+    // Muse's first reply means the Worker let us in and Muse took the config; nothing within `timeout`, give up.
+    let deadline = Task { try await Task.sleep(for: .seconds(timeout)); task.cancel(with: .goingAway, reason: nil) }
+    defer { deadline.cancel() }
+    do {
+      if case .string(let first) = try await task.receive(), MuseEvent.decode(first) == .ready { return (task, 200) }
+      task.cancel(with: .goingAway, reason: nil)
+      return (nil, 502)
+    } catch {
+      let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
+      task.cancel(with: .goingAway, reason: nil)
+      if status == 0 { throw error }
+      return (nil, status)
+    }
+  }
+
   public func turn(_ t: TurnRequest) -> AsyncThrowingStream<CoachEvent, Error> { stream("v1/turn", t) }
 
   private func stream(_ path: String, _ body: some Encodable & Sendable) -> AsyncThrowingStream<CoachEvent, Error> {
