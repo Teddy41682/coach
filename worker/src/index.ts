@@ -4,7 +4,7 @@ import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
 import { realMillicents, settleObserve } from "./limits";
-import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
+import { checkAndCount, checkObserve, costOf, D1UsageStore, GLOBAL_DAILY_CENTS, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { observeFrame } from "./observe";
 import { isMindRequest, wakeMind, type MindContext } from "./mind";
 import { mindSystem, mindUser } from "./expertise/mind-prompt";
@@ -14,6 +14,7 @@ import { D1SessionStore, type SessionStore } from "./session";
 import { encodeEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
 import { verifyToken } from "./token";
+import { MUSE_ASR_URL, relay, type Sock } from "./listen";
 
 export interface Env {
   MODEL_API_KEY: string;
@@ -27,7 +28,11 @@ export interface Env {
 /** What the routes need from the world, so tests can swap the store and the model. */
 /** `link` answers are long JSON after the model has reasoned, so linking gets a bigger token allowance. */
 export type Purpose = "turn" | "link" | "observe" | "mind";
-export type Deps = { store: SessionStore; usage: UsageStore; model: (purpose: Purpose) => ModelConnector; now: () => number };
+export type Deps = {
+  store: SessionStore; usage: UsageStore; model: (purpose: Purpose) => ModelConnector; now: () => number;
+  /** Muse's realtime transcription socket, opened; null when it wouldn't open. */
+  muse?: () => Promise<Sock | null>;
+};
 /** Measured 2026-10-27: linking alone used 281 reasoning + ~90 answer tokens and 400 truncated it; briefings add ~60 tokens a step. */
 export const LINK_MAX_TOKENS = 4_000;
 
@@ -104,19 +109,23 @@ function sameKey(given: string | null, expected: string): boolean {
 
 const bad = (status: number, error: string) => Response.json({ error }, { status });
 
+/** The app key, or a valid host-app token (its caller is `sub:<sub>`). */
+async function authorise(request: Request, env: Env, nowMs: number): Promise<{ caller: string | null } | Response> {
+  const given = request.headers.get("X-Coach-Key");
+  if (sameKey(given, env.COACH_APP_KEY)) return { caller: null };
+  const sub = await verifyToken(given, env.COACH_TOKEN_SECRET, nowMs);
+  return sub ? { caller: `sub:${sub}` } : bad(401, "unauthorised");
+}
+
 /**
  * Auth, size cap and JSON parse, shared by every POST route. Returns the parsed body and, for a token caller, the
  * id its limits and sessions belong to (`sub:<sub>` — the colon keeps it apart from any device id); an app-key
  * caller has none and is known by its device header.
  */
 async function admit(request: Request, env: Env, nowMs: number): Promise<{ body: unknown; caller: string | null } | Response> {
-  const given = request.headers.get("X-Coach-Key");
-  let caller: string | null = null;
-  if (!sameKey(given, env.COACH_APP_KEY)) {
-    const sub = await verifyToken(given, env.COACH_TOKEN_SECRET, nowMs);
-    if (!sub) return bad(401, "unauthorised");
-    caller = `sub:${sub}`;
-  }
+  const who = await authorise(request, env, nowMs);
+  if (who instanceof Response) return who;
+  const caller = who.caller;
   if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) return bad(413, "too_large");
   const text = await readBounded(request, MAX_BODY_BYTES);
   if (text === null) return bad(413, "too_large");
@@ -125,6 +134,7 @@ async function admit(request: Request, env: Env, nowMs: number): Promise<{ body:
 
 async function handle(request: Request, env: Env, deps: Deps): Promise<Response> {
   const url = new URL(request.url);
+  if (url.pathname === "/v1/listen" && request.method === "GET") return listen(request, env, deps);
   if (request.method !== "POST") return bad(404, "not_found");
 
   if (url.pathname === "/v1/session") {
@@ -249,6 +259,30 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
   return bad(404, "not_found");
 }
 
+/** The cook's microphone to Muse Voice Transcribe and its words back (`listen.ts`): a WebSocket, keyed like the rest. */
+async function listen(request: Request, env: Env, deps: Deps): Promise<Response> {
+  const who = await authorise(request, env, deps.now());
+  if (who instanceof Response) return who;
+  if (!(who.caller ?? deviceOf(request))) return bad(400, "no_device");
+  if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return bad(426, "websocket_only");
+  // Transcription is $0.18 an hour, but it is still our credit: the day's global cap stops it like everything else.
+  if ((await deps.usage.totalCents(hstDay(deps.now()))) >= GLOBAL_DAILY_CENTS) return bad(429, "daily_limit");
+  const muse = await deps.muse?.();
+  if (!muse) return bad(502, "no_transcriber");
+  const [phone, server] = Object.values(new WebSocketPair());
+  server.accept();
+  relay(server as unknown as Sock, muse, env.MODEL_API_KEY);
+  return new Response(null, { status: 101, webSocket: phone });
+}
+
+async function openMuse(): Promise<Sock | null> {
+  const r = await fetch(MUSE_ASR_URL, { headers: { Upgrade: "websocket", "User-Agent": "coach-worker" } });
+  const ws = r.webSocket;
+  if (!ws) return null;
+  ws.accept();
+  return ws as unknown as Sock;
+}
+
 export default {
   fetch(request: Request, env: Env): Promise<Response> {
     return handle(request, env, {
@@ -258,6 +292,7 @@ export default {
         ? new MuseConnector(env.MODEL_API_KEY, "muse-spark-1.3", "minimal", undefined, LINK_MAX_TOKENS)
         : new MuseConnector(env.MODEL_API_KEY),
       now: () => Date.now(),
+      muse: openMuse,
     });
   },
   handle,
