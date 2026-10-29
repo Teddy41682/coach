@@ -7,8 +7,12 @@
  * `speechEnd`, `speechComplete`, `error`), passed back untouched.
  */
 export const MUSE_ASR_URL = "https://api.meta.ai/v1/asr/realtime";
-/** Longer than any cook we'd coach (the boule is the longest, under 3 h of hands-on time); then the socket closes. */
-export const LISTEN_MAX_MS = 3 * 60 * 60 * 1000;
+/**
+ * One socket lives at most 30 minutes and is charged its worst case up front — 9¢ (Muse is $0.18 an hour) — against
+ * the device's and the day's caps, so held-open sockets can't spend past them. A longer cook's phone opens another.
+ */
+export const LISTEN_MAX_MS = 30 * 60 * 1000;
+export const LISTEN_CENTS = 9;
 /** Audio held while Muse acknowledges the config: ~10 s at 48 KB/s. More than that and the relay gives up. */
 export const MAX_HELD_BYTES = 500_000;
 
@@ -34,7 +38,7 @@ export interface Sock {
 export function relay(phone: Sock, muse: Sock, key: string, maxMs = LISTEN_MAX_MS, setTimer = setTimeout): void {
   let open = true;
   let acked = false;
-  let held: (string | ArrayBuffer)[] = [];
+  let held: ArrayBuffer[] = [];
   let heldBytes = 0;
   const end = (code = 1000, reason = "") => {
     if (!open) return;
@@ -54,8 +58,10 @@ export function relay(phone: Sock, muse: Sock, key: string, maxMs = LISTEN_MAX_M
   });
   phone.addEventListener("message", (e) => {
     if (!open) return;
+    // Audio only: a text frame from the phone could re-configure Muse's session with our key behind it.
+    if (typeof e.data === "string") { end(1003, "audio_only"); return; }
     if (acked) { muse.send(e.data); return; }
-    heldBytes += typeof e.data === "string" ? e.data.length : e.data.byteLength;
+    heldBytes += e.data.byteLength;
     if (heldBytes > MAX_HELD_BYTES) { end(1011, "muse_silent"); return; }
     held.push(e.data);
   });

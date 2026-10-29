@@ -4,7 +4,7 @@ import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
 import { realMillicents, settleObserve } from "./limits";
-import { checkAndCount, checkObserve, costOf, D1UsageStore, GLOBAL_DAILY_CENTS, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
+import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { observeFrame } from "./observe";
 import { isMindRequest, wakeMind, type MindContext } from "./mind";
 import { mindSystem, mindUser } from "./expertise/mind-prompt";
@@ -14,7 +14,7 @@ import { D1SessionStore, type SessionStore } from "./session";
 import { encodeEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
 import { verifyToken } from "./token";
-import { MUSE_ASR_URL, relay, type Sock } from "./listen";
+import { LISTEN_CENTS, MUSE_ASR_URL, relay, type Sock } from "./listen";
 
 export interface Env {
   MODEL_API_KEY: string;
@@ -263,10 +263,11 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
 async function listen(request: Request, env: Env, deps: Deps): Promise<Response> {
   const who = await authorise(request, env, deps.now());
   if (who instanceof Response) return who;
-  if (!(who.caller ?? deviceOf(request))) return bad(400, "no_device");
+  const device = who.caller ?? deviceOf(request);
+  if (!device) return bad(400, "no_device");
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return bad(426, "websocket_only");
-  // Transcription is $0.18 an hour, but it is still our credit: the day's global cap stops it like everything else.
-  if ((await deps.usage.totalCents(hstDay(deps.now()))) >= GLOBAL_DAILY_CENTS) return bad(429, "daily_limit");
+  // Charged its worst case before Muse is opened, against the device's and the day's caps (`listen.ts`).
+  if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), LISTEN_CENTS)) !== "ok") return bad(429, "daily_limit");
   const muse = await deps.muse?.();
   if (!muse) return bad(502, "no_transcriber");
   const [phone, server] = Object.values(new WebSocketPair());

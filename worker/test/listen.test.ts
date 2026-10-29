@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import worker, { type Deps } from "../src/index";
-import { MAX_HELD_BYTES, museConfig, relay, type Sock } from "../src/listen";
+import { LISTEN_CENTS, MAX_HELD_BYTES, museConfig, relay, type Sock } from "../src/listen";
 import { GLOBAL_DAILY_CENTS, hstDay, MemoryUsageStore } from "../src/limits";
 import { MemorySessionStore } from "../src/session";
 
@@ -55,6 +55,14 @@ describe("the relay to Muse", () => {
     for (let i = 0; i * 4800 <= MAX_HELD_BYTES; i++) phone.fire("message", audio(4800));
     expect(phone.closed?.reason).toBe("muse_silent");
   });
+  it("passes the phone's audio only: a text frame closes it, and never reaches Muse", () => {
+    const phone = new Fake(), muse = new Fake();
+    relay(phone, muse, "k", 1000, never);
+    muse.fire("message", '{"sessionId":"x"}');
+    phone.fire("message", '{"authorization":{"accessToken":"Bearer theirs"}}');
+    expect(muse.sent).toHaveLength(1);
+    expect(phone.closed?.reason).toBe("audio_only");
+  });
   it("closes both after the longest cook", () => {
     const phone = new Fake(), muse = new Fake();
     let fire = () => {};
@@ -92,6 +100,11 @@ describe("the /v1/listen door", () => {
     const d = deps(null, usage);
     expect((await worker.handle(get(H), env, d)).status).toBe(429);
     expect(d.asked).toBe(0);
+  });
+  it("charges each socket its worst case before Muse is opened", async () => {
+    const usage = new MemoryUsageStore();
+    await worker.handle(get(H), env, deps(null, usage));
+    expect(await usage.totalCents(hstDay(Date.now()))).toBe(LISTEN_CENTS);
   });
   it("says so when Muse won't open", async () => {
     expect((await worker.handle(get(H), env, deps(null))).status).toBe(502);
