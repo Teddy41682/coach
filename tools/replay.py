@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Replay a Coach recording through the eyes and the mind, as if it were live.
 
-Usage: python3 tools/replay.py <Recordings/<stamp> folder> [--recipe tuna|eggs|boule] [--dry] [--no-spoken]
+Usage: python3 tools/replay.py <Recordings/<stamp> folder> [--recipe pbj|tuna|eggs|boule] [--dry] [--no-spoken]
                                [--out scorecard.md] [--json out.json] [--device replay-test]
 
 The recording's frames are looked at two a second by the same eyes as the phone (Eyes.swift — keep the constants
@@ -401,7 +401,7 @@ def render(r):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("folder", type=pathlib.Path)
-    ap.add_argument("--recipe", choices=["tuna", "eggs", "boule"])
+    ap.add_argument("--recipe", choices=["pbj", "tuna", "eggs", "boule"])
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--no-spoken", action="store_true")
     ap.add_argument("--out", type=pathlib.Path)

@@ -1,8 +1,23 @@
 import CoachKit
 
-/// The demo's built-in dishes: his own boule, and two quick lunches for test cooks.
+/// The demo's built-in dishes: the drill sandwich, his own boule, and two quick lunches for test cooks.
 enum Recipes {
-  static let all = [tuna, eggs, boule]
+  static let all = [pbj, tuna, eggs, boule]
+
+  /// The drill (2026-10-29): a minute, pennies, no stove — cooked over and over until the coach gets it right.
+  static let pbj = CoachRecipe(
+    title: "Peanut Butter and Jelly Sandwich",
+    ingredients: [
+      .init(amount: "2 slices", item: "bread"), .init(amount: "2 tbsp", item: "peanut butter"),
+      .init(amount: "1 tbsp", item: "jelly or jam"),
+    ],
+    steps: [
+      "Lay two slices of bread side by side on a plate.",
+      "Spread the peanut butter on one slice, right to the edges.",
+      "Spread the jelly on the other slice.",
+      "Press the two slices together, spreads facing in.",
+      "Cut the sandwich in half.",
+    ])
 
   /// His quick lunch, in his steps (2026-10-27).
   static let tuna = CoachRecipe(

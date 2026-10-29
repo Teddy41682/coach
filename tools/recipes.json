@@ -1,4 +1,7 @@
 {
+ "pbj": {"title": "Peanut Butter and Jelly Sandwich",
+  "ingredients": [{"amount": "2 slices", "item": "bread"}, {"amount": "2 tbsp", "item": "peanut butter"}, {"amount": "1 tbsp", "item": "jelly or jam"}],
+  "steps": ["Lay two slices of bread side by side on a plate.", "Spread the peanut butter on one slice, right to the edges.", "Spread the jelly on the other slice.", "Press the two slices together, spreads facing in.", "Cut the sandwich in half."]},
  "tuna": {"title": "Quick Tuna Salad",
   "ingredients": [{"amount": "1 can", "item": "tuna"}, {"amount": "2 tbsp", "item": "mayo"}, {"amount": "2", "item": "pickles"}, {"amount": "1 tbsp", "item": "pickled onions"}, {"amount": "1 pinch", "item": "salt"}, {"amount": "1 pinch", "item": "pepper"}],
   "steps": ["Open the can of tuna, press the lid down and drain off all the water.", "Put the tuna into a bowl.", "Mix in the mayo.", "Chop the pickles and the pickled onions and mix them in.", "Season with salt and pepper and mix it all together."]},
