@@ -1,0 +1,12 @@
+{
+  "_doc": "Planted mistakes per recording: the coach must name it (any keyword) in a line between `at` and `at + within` seconds. Times are the recording's own.",
+  "2026-10-30T22-12-21Z": [
+    {"what": "tortillas for bread", "at": 36, "within": 15, "any": ["tortilla"]},
+    {"what": "peanut butter on the plate", "at": 62, "within": 10, "any": ["plate"]}
+  ],
+  "2026-10-30T22-38-27Z": [
+    {"what": "tortillas for bread", "at": 41, "within": 10, "any": ["tortilla"]},
+    {"what": "peanut butter on the plate", "at": 78, "within": 10, "any": ["plate"]},
+    {"what": "jelly on the peanut-butter slice", "at": 123, "within": 10, "any": ["peanut butter", "plain", "other slice", "bare"]}
+  ]
+}

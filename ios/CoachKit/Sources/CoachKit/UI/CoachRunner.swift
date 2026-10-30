@@ -96,7 +96,7 @@ public final class CoachRunner {
 
   public func start() async {
     do {
-      if let recorder { device.onFrame = { recorder.frame($0, at: $1) }; recorder.note(.note("start: \(recipe.title)")) }
+      if let recorder { device.onFrame = { recorder.frame($0, at: $1) }; recorder.note(.note("start: \(recipe.title)")); recorder.note(.note("voice: \(Speaker.voiceName)")) }
       if stopped { return }
       try await device.start()
       if abandoned() { return }

@@ -18,6 +18,13 @@ public final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     return english.max { $0.quality.rawValue < $1.quality.rawValue } ?? AVSpeechSynthesisVoice(language: "en-US")
   }()
 
+  /// "Ava (Premium)" — which voice the cook heard, for the recording: a compact voice stumbles and clips words.
+  public static var voiceName: String {
+    guard let v = chosenVoice else { return "system default" }
+    let q = switch v.quality { case .premium: "Premium"; case .enhanced: "Enhanced"; default: "Default" }
+    return "\(v.name) (\(q), \(v.language))"
+  }
+
   public override init() {
     voice = Self.chosenVoice
     super.init()

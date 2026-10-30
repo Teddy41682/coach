@@ -217,6 +217,12 @@ def load(folder):
     return events, looks
 
 
+def step_line(steps, i):
+    """As the phone reads a step (CoachSession.speakStep)."""
+    s = steps[i]
+    return f"Last one: {s}" if i == len(steps) - 1 else f"Next, {s[:1].lower() + s[1:]}"
+
+
 def replay(folder, recipe, worker=None, spoken=True):
     events, looks = load(folder)
     title_said = [e for e in events if e["kind"] == "said"]
@@ -239,9 +245,12 @@ def replay(folder, recipe, worker=None, spoken=True):
     def cook_speaking(t):
         return any(h["t"] - max(1.0, len(h["text"].split()) / 2.5) <= t <= h["t"] + 0.3 for h in heard)
 
+    talk = [(h["t"] - max(1.0, len(h["text"].split()) / 2.5), h["t"], "cook") for h in heard]
+
     def coach_say(t, line, unprompted=False):
         at = max(t, st["coach_until"])
         st["coach_until"] = at + speech_seconds(line)
+        talk.append((at, st["coach_until"], "coach"))
         st["last_speech"] = st["coach_until"]
         tl.add(at, "coach", line)
         rows.append((at, "mind", ("» " if unprompted else "") + line))
@@ -253,11 +262,12 @@ def replay(folder, recipe, worker=None, spoken=True):
             return
         if st["step"] + 1 >= len(steps):
             st["finished"] = True
+            st["finished_at"] = t
             coach_say(t, "That was the last step. Enjoy it.")
             return
         st["step"] += 1
         st["step_start"] = t
-        coach_say(t, f"Step {st['step'] + 1}: {steps[st['step']]}")
+        coach_say(t, step_line(steps, st["step"]))
 
     def frames_at(t, n=2, since=None):
         past = [p for (ft, p) in looks if ft <= t and (since is None or ft >= since)]
@@ -266,7 +276,7 @@ def replay(folder, recipe, worker=None, spoken=True):
             return past
         return past[-n:]
 
-    coach_say(start, f"Let's make {recipe['title']}. Step 1: {steps[0]}")
+    coach_say(start, f"Right, let's make {recipe['title']}. First, {steps[0][:1].lower() + steps[0][1:]}")
     for t, p in looks:
         if t >= start:
             push(t, "look", p)
@@ -384,6 +394,9 @@ def replay(folder, recipe, worker=None, spoken=True):
         "unprompted": says, "steps_reached": st["step"] + 1, "finished": st["finished"],
         "first_word": [float(re.search(r"([\d.]+) s", f).group(1)) for f in firsts],
         "rows": sorted(actual + rows, key=lambda r: r[0]),
+        "start": start, "end": st.get("finished_at", end), "talk": sorted(talk),
+        "said": [(round(t, 1), text.lstrip("» ")) for t, col, text in rows
+                 if col == "mind" and not text.startswith(("[", "  "))],
     }
 
 
