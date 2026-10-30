@@ -65,7 +65,8 @@ public struct Eyes: Sendable {
   /// anyway. Waiting for a settled picture meant the mind never saw the spreading on his second PB&J (2026-10-30): it
   /// woke only when he stopped, and he had to ask "how does this look?" to get anything.
   public static let working = 5.0
-  public static let heartbeat = 30.0
+  /// A look anyway after this long with nothing else waking it (30 s left long silences on his third PB&J).
+  public static let heartbeat = 15.0
 
   private var reference: Thumb?
   private var history: [(at: Date, thumb: Thumb)] = []

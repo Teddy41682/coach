@@ -15,10 +15,9 @@ public final class Mind {
     /// A spoken turn is in flight (from the cook's words to the end of the answer): the one call in flight.
     public var turnActive: Bool
     /// On the recipe's last step: the eyes may say it looks done, but finishing the recipe takes the cook's word.
-    public var lastStep: Bool
-    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool, turnActive: Bool = false, lastStep: Bool = false) {
+    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool, turnActive: Bool = false) {
       self.step = step; self.finished = finished; self.cookSpeaking = cookSpeaking; self.coachSpeaking = coachSpeaking
-      self.turnActive = turnActive; self.lastStep = lastStep
+      self.turnActive = turnActive
     }
   }
   /// What to do with an answer: say this (if anything), then this with the step.
@@ -118,16 +117,10 @@ public final class Mind {
     s = state()
     if s.step != req.stepIndex || lastCookSpoke > t || s.turnActive { return nil }
     var say = answer.say, step = answer.step
-    if step == .next && s.lastStep { step = .stay }
-    if say != nil || step == .next {
-      let landed = now()
-      if guardrails.allows(at: landed, cookSpeaking: s.cookSpeaking, coachSpeaking: s.coachSpeaking, finished: s.finished,
-                           movingOn: step == .next) {
-        if say != nil { guardrails.spoke(at: landed) }
-      } else {
-        say = nil
-        if step == .next { step = .stay }
-      }
+    if (say != nil || step == .next),
+       !guardrails.allows(cookSpeaking: s.cookSpeaking, coachSpeaking: s.coachSpeaking, finished: s.finished) {
+      say = nil
+      if step == .next { step = .stay }
     }
     if step == .hold { holdPlace(step: s.step) } else if held {
       held = false

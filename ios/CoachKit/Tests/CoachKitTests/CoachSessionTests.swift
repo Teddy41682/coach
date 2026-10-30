@@ -278,11 +278,20 @@ import Testing
   }
 
   @Test func theEndIsSaidOnce() async {
-    let rig = Rig(); rig.reply = [.text("All mixed."), .action(.next), .done]
+    let rig = Rig(); rig.reply = [.action(.next), .done]
     let s = rig.session(steps: ["Only step."])
-    await s.handle(.question("done?"))          // the coach's next finishes the recipe
+    await s.handle(.question("done?"))          // the coach's silent next finishes the recipe
     await s.handle(.next)                       // the cook asks again
     await s.handle(.question("bye"))            // and the coach says next again
     #expect(rig.said.filter { $0 == "That was the last step. Enjoy it." }.count == 1)
+  }
+
+  /// His third PB&J: "Yep, that's the whole sandwich — enjoy it." then "That was the last step. Enjoy it."
+  @Test func whenTheCoachHasSaidItsPieceTheEndAddsNothing() async {
+    let rig = Rig(); rig.reply = [.text("Yep, that's the whole sandwich — enjoy it."), .action(.next), .done]
+    let s = rig.session(steps: ["Only step."])
+    await s.handle(.question("is that everything?"))
+    #expect(s.phase == .finished)
+    #expect(rig.said == ["Yep, that's the whole sandwich — enjoy it."])
   }
 }

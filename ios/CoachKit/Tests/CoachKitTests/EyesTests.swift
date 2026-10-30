@@ -56,8 +56,8 @@ func greyJPEG(width: Int = 504, height: Int = 896, base: CGFloat = 0.3, block: C
   @Test func theSamePictureNeverWakesItUntilTheHeartbeat() {
     var e = Eyes(); e.woke(at: at(0), showing: same)
     #expect(e.look(same, at: at(10), busy: false) == nil)
-    #expect(e.look(same, at: at(29.5), busy: false) == nil)
-    #expect(e.look(same, at: at(30), busy: false) == .heartbeat)
+    #expect(e.look(same, at: at(14.5), busy: false) == nil)
+    #expect(e.look(same, at: at(15), busy: false) == .heartbeat)
   }
 
   @Test func aChangeWakesItOnceThePictureIsSteady() {
@@ -89,9 +89,9 @@ func greyJPEG(width: Int = 504, height: Int = 896, base: CGFloat = 0.3, block: C
 
   @Test func aSpokenWakeResetsTheHeartbeatButNotTheSpacing() {
     var e = Eyes(); e.woke(at: at(0), showing: same)
-    e.woke(at: at(20), showing: same, eye: false)
-    #expect(e.look(same, at: at(40), busy: false) == nil)
-    #expect(e.look(same, at: at(50), busy: false) == .heartbeat)
+    e.woke(at: at(10), showing: same, eye: false)
+    #expect(e.look(same, at: at(24.5), busy: false) == nil)
+    #expect(e.look(same, at: at(25), busy: false) == .heartbeat)
   }
 
   @Test func nothingWhileACallIsInFlight() {

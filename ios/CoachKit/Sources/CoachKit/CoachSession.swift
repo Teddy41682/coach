@@ -65,6 +65,9 @@ public final class CoachSession {
   /// A timer the cook set has ended — the mind is woken to look.
   public var onTimerEnded: (() -> Void)?
 
+  /// The mind saw the step was done and moved on unprompted — on the last step, that finishes the recipe.
+  public func coachMovedOn(saidSomething: Bool) { advance(quietEnd: saidSomething) }
+
   /// Something the coach said outside a turn (the observer speaking up, holding the place), so turns build on it.
   public func noteCoach(_ line: String) { remember(.coach, line) }
 
@@ -74,10 +77,12 @@ public final class CoachSession {
     if history.count > Self.historyLimit { history.removeFirst(history.count - Self.historyLimit) }
   }
 
-  private func advance() {
+  /// `quietEnd`: the coach has just said its piece, so finishing adds no line of its own ("Yep, that's the whole
+  /// sandwich — enjoy it." then "That was the last step. Enjoy it." on his third PB&J).
+  private func advance(quietEnd: Bool = false) {
     // Once finished, say nothing more about steps: the ending was said three times on his second cook.
     if phase == .finished { return }
-    if stepIndex + 1 >= steps.count { phase = .finished; say("That was the last step. Enjoy it."); return }
+    if stepIndex + 1 >= steps.count { phase = .finished; if !quietEnd { say("That was the last step. Enjoy it.") }; return }
     stepIndex += 1; stepStartedAt = now(); speakStep()
   }
 
@@ -170,7 +175,7 @@ public final class CoachSession {
       say(Self.lostLine)
     }
     remember(.coach, spoken.joined(separator: " "))
-    if decision == .next { advance() }
+    if decision == .next { advance(quietEnd: !spoken.isEmpty) }
     if decision == .hold { onHold?() }
   }
 

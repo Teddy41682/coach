@@ -1,20 +1,16 @@
 import Foundation
 
 /// The only rules the coach keeps — everything else is the mind's judgement (spec 2026-10-27, eyes and one mind):
-/// never speak over the cook or over itself, never more than one unprompted line per 12 s — except to say a step is
-/// done and move on, which is never held back — nothing unprompted once the recipe is finished, and never past the
-/// spend cap. (20 s, then his second PB&J: a step finished just after an expert touch waited for him to say "done".)
+/// never speak over the cook or over itself, nothing unprompted once the recipe is finished, and never past the spend
+/// cap. No spacing between lines: his third PB&J (2026-10-30) felt the forced quiet — three good lines were held back
+/// by a 12 s gap, leaving 18–20 s silences — and he wants it to talk when it has something to say.
 public struct Guardrails: Sendable {
-  public static let spacing = 12.0
   /// What one cook's eye wakes may spend, in cents, before the eyes close (the Worker's daily cap still stands behind it).
   public static let centsCap = 100.0
-  private var last: Date = .distantPast
 
   public init() {}
 
-  public func allows(at now: Date, cookSpeaking: Bool, coachSpeaking: Bool, finished: Bool, movingOn: Bool = false) -> Bool {
-    !(cookSpeaking || coachSpeaking || finished) && (movingOn || now.timeIntervalSince(last) >= Self.spacing - 1e-6)
+  public func allows(cookSpeaking: Bool, coachSpeaking: Bool, finished: Bool) -> Bool {
+    !(cookSpeaking || coachSpeaking || finished)
   }
-
-  public mutating func spoke(at now: Date) { last = now }
 }

@@ -97,7 +97,8 @@ describe("the mind's judgement, v4 (his first PB&J, 2026-10-30)", () => {
       recipe: { title: "PB&J", ingredients: [], steps: ["Spread it."] }, stepIngredients: [],
       briefing: { done: "", mistakes: "", tip: "", hardToSee: false } } as never;
     const s = mindSystem(ctx, false);
-    expect(s).toContain("about once a step");
+    expect(s).toContain("lean in the way a chef would");
+    expect(s).toContain("you don't have to be quiet");
     expect(s).toContain("Be honest about what the photos show");
     expect(s).not.toContain("Unprompted is never for tips");
   });

@@ -122,7 +122,8 @@ public final class CoachRunner {
       try await listener.start()
       if abandoned() { return }
       watchAudioRoute()
-      say("Let's make \(recipe.title). First: \(steps.first?.text ?? "")")
+      // A hello first, like a person (his third PB&J): his answer is a spoken turn, and the mind chats back.
+      say("Hey — how's your day going? We're making \(recipe.title) today. First: \(steps.first?.text ?? "")")
       refresh()
       watchDevice()
       watch(session, mind)
@@ -182,13 +183,12 @@ public final class CoachRunner {
         let outcome = await mind.tick {
           Mind.Now(step: session.stepIndex, finished: session.phase == .finished,
                    cookSpeaking: self.listener?.isHearing ?? false, coachSpeaking: self.speaker.isSpeaking,
-                   turnActive: self.turning,
-                   lastStep: session.stepIndex >= session.steps.count - 1)
+                   turnActive: self.turning)
         }
         self.away = mind.held
         guard let outcome, !self.stopped else { continue }
         if let line = outcome.say { self.say(line); session.noteCoach(line) }
-        if outcome.step == .next { await session.handle(.next); self.refresh() }
+        if outcome.step == .next { session.coachMovedOn(saidSomething: outcome.say != nil); self.refresh() }
       }
     }
   }

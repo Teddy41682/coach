@@ -5,24 +5,13 @@ import Testing
 @Suite struct GuardrailsTests {
   let t0 = Date(timeIntervalSince1970: 1_000)
 
-  @Test func movingOnIsNeverHeldBackBySpacingButNeverOverTheCook() {
-    var g = Guardrails()
-    g.spoke(at: t0)
-    #expect(g.allows(at: t0.addingTimeInterval(3), cookSpeaking: false, coachSpeaking: false, finished: false, movingOn: true))
-    #expect(!g.allows(at: t0.addingTimeInterval(3), cookSpeaking: false, coachSpeaking: false, finished: false))
-    #expect(!g.allows(at: t0.addingTimeInterval(3), cookSpeaking: true, coachSpeaking: false, finished: false, movingOn: true))
-  }
-
-  @Test func neverOverTheCookOrItselfOnceInTwelveSecondsAndNotAfterFinishing() {
-    var g = Guardrails()
-    let at = { (s: Double) in self.t0.addingTimeInterval(s) }
-    #expect(!g.allows(at: at(10), cookSpeaking: true, coachSpeaking: false, finished: false))
-    #expect(!g.allows(at: at(10), cookSpeaking: false, coachSpeaking: true, finished: false))
-    #expect(g.allows(at: at(10), cookSpeaking: false, coachSpeaking: false, finished: false))
-    g.spoke(at: at(10))
-    #expect(!g.allows(at: at(21.9), cookSpeaking: false, coachSpeaking: false, finished: false))
-    #expect(g.allows(at: at(22), cookSpeaking: false, coachSpeaking: false, finished: false))
-    #expect(!g.allows(at: at(90), cookSpeaking: false, coachSpeaking: false, finished: true))
+  /// No spacing between lines (his third PB&J): only never over the cook, never over itself, nothing after finishing.
+  @Test func neverOverTheCookOrItselfAndNotAfterFinishingButNoForcedQuiet() {
+    let g = Guardrails()
+    #expect(!g.allows(cookSpeaking: true, coachSpeaking: false, finished: false))
+    #expect(!g.allows(cookSpeaking: false, coachSpeaking: true, finished: false))
+    #expect(!g.allows(cookSpeaking: false, coachSpeaking: false, finished: true))
+    #expect(g.allows(cookSpeaking: false, coachSpeaking: false, finished: false))
   }
 }
 
@@ -98,16 +87,6 @@ import Testing
     #expect(await rig.tick(m, at: 1) == nil)
   }
 
-  @Test func atMostOneUnpromptedLineEveryTwentySeconds() async {
-    let rig = MindRig(); let m = rig.mind()
-    rig.answers = (0..<3).map { _ in MindRig.answer(say: "Cold pan.") }
-    #expect(await rig.tick(m, at: 1) != nil)
-    rig.thumb = MindRig.other
-    for t in [4.0, 4.5] { _ = await rig.tick(m, at: t) }
-    #expect(await rig.tick(m, at: 5) == nil)              // the picture changed and it wanted to speak: 4 s since its last line
-    #expect(rig.sent.count == 2)
-  }
-
   @Test func anAnswerAboutAStepAlreadyLeftIsDropped() async {
     let rig = MindRig(); let m = rig.mind()
     rig.hold = true
@@ -158,11 +137,24 @@ import Testing
     #expect(await first.value == nil)
   }
 
-  @Test func theEyesNeverFinishTheRecipe() async {
+  /// His third PB&J: on the last step the mind said "two clean halves — done" twice and the recipe never ended; seeing
+  /// the last step done now finishes it, like any other step.
+  @Test func theEyesMayFinishTheRecipe() async {
     let rig = MindRig(); let m = rig.mind()
-    rig.state.lastStep = true
     rig.answers = [MindRig.answer(say: "That's done.", step: .next)]
-    #expect(await rig.tick(m, at: 1) == Mind.Outcome(say: "That's done.", step: .stay))
+    #expect(await rig.tick(m, at: 1) == Mind.Outcome(say: "That's done.", step: .next))
+  }
+
+  /// Two lines a few seconds apart both get said: nothing holds the second back.
+  @Test func linesAFewSecondsApartAreBothSaid() async {
+    let rig = MindRig(); let m = rig.mind()
+    rig.answers = [MindRig.answer(say: "Keep it light.", step: .stay)]
+    #expect(await rig.tick(m, at: 1)?.say == "Keep it light.")
+    rig.thumb = MindRig.other
+    rig.answers = [MindRig.answer(say: "Leave a little border.", step: .stay)]
+    var said: String?
+    for t in stride(from: 1.5, through: 9, by: 0.5) where said == nil { said = await rig.tick(m, at: t)?.say }
+    #expect(said == "Leave a little border.")
   }
 
   @Test func nothingUnpromptedOnceFinished() async {
