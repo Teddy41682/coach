@@ -26,6 +26,7 @@ THUMB = 8            # thumbnail side, px
 CHANGE = 0.10        # this different from the mind's last look…
 STEADY = 0.06        # …and no more than this different from a second ago (the cook has settled on something)
 SPACING = 2.5        # eye wakes at least this far apart
+WORKING = 5.0        # while the picture keeps changing without settling (hands at work), a look this often anyway
 HEARTBEAT = 30.0     # a look anyway after this long without one
 LOOK_EVERY = 0.5     # the phone's frame buffer keeps two a second
 
@@ -68,7 +69,9 @@ class Eyes:
         if not before:
             return None
         steady = diff(th, before[-1][1]) <= STEADY
-        return "changed" if steady and diff(th, self.reference) >= CHANGE else None
+        if diff(th, self.reference) < CHANGE:
+            return None
+        return "changed" if steady or t - self.last_eye >= WORKING - 1e-6 else None
 
     def woke(self, t, th, eye=True):
         """The mind was called at t, shown th (spoken wakes count for the heartbeat, not the spacing)."""

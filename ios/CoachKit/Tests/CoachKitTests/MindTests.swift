@@ -5,15 +5,23 @@ import Testing
 @Suite struct GuardrailsTests {
   let t0 = Date(timeIntervalSince1970: 1_000)
 
-  @Test func neverOverTheCookOrItselfOnceInTwentySecondsAndNotAfterFinishing() {
+  @Test func movingOnIsNeverHeldBackBySpacingButNeverOverTheCook() {
+    var g = Guardrails()
+    g.spoke(at: t0)
+    #expect(g.allows(at: t0.addingTimeInterval(3), cookSpeaking: false, coachSpeaking: false, finished: false, movingOn: true))
+    #expect(!g.allows(at: t0.addingTimeInterval(3), cookSpeaking: false, coachSpeaking: false, finished: false))
+    #expect(!g.allows(at: t0.addingTimeInterval(3), cookSpeaking: true, coachSpeaking: false, finished: false, movingOn: true))
+  }
+
+  @Test func neverOverTheCookOrItselfOnceInTwelveSecondsAndNotAfterFinishing() {
     var g = Guardrails()
     let at = { (s: Double) in self.t0.addingTimeInterval(s) }
     #expect(!g.allows(at: at(10), cookSpeaking: true, coachSpeaking: false, finished: false))
     #expect(!g.allows(at: at(10), cookSpeaking: false, coachSpeaking: true, finished: false))
     #expect(g.allows(at: at(10), cookSpeaking: false, coachSpeaking: false, finished: false))
     g.spoke(at: at(10))
-    #expect(!g.allows(at: at(29), cookSpeaking: false, coachSpeaking: false, finished: false))
-    #expect(g.allows(at: at(30), cookSpeaking: false, coachSpeaking: false, finished: false))
+    #expect(!g.allows(at: at(21.9), cookSpeaking: false, coachSpeaking: false, finished: false))
+    #expect(g.allows(at: at(22), cookSpeaking: false, coachSpeaking: false, finished: false))
     #expect(!g.allows(at: at(90), cookSpeaking: false, coachSpeaking: false, finished: true))
   }
 }

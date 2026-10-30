@@ -67,12 +67,16 @@ func greyJPEG(width: Int = 504, height: Int = 896, base: CGFloat = 0.3, block: C
     #expect(e.look(other, at: at(6), busy: false) == .changed)
   }
 
-  @Test func aPictureStillMovingDoesNotWakeIt() {
+  /// Hands at work never settle the picture: the mind is still woken, every `working` seconds, not twice a second.
+  @Test func handsAtWorkAreLookedAtEveryFiveSeconds() {
     var e = Eyes(); e.woke(at: at(0), showing: same)
-    for k in 0..<12 {
+    var wakes: [Double] = []
+    for k in 0..<24 {
+      let t = 1 + Double(k) * 0.5
       let moving = Thumb(pixels: (0..<64).map { UInt8((($0 * 37) + k * 50) % 256) })
-      #expect(e.look(moving, at: at(5 + Double(k) * 0.5), busy: false) == nil)
+      if e.look(moving, at: at(t), busy: false) == .changed { wakes.append(t); e.woke(at: at(t), showing: moving) }
     }
+    #expect(wakes == [5, 10])
   }
 
   @Test func eyeWakesAreAtLeastTwoAndAHalfSecondsApart() {

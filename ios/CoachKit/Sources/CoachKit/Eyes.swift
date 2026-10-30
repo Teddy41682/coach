@@ -61,6 +61,10 @@ public struct Eyes: Sendable {
   /// …and no more than this different from a second ago.
   public static let steady = 0.06
   public static let spacing = 2.5
+  /// While the cook is busy — the picture changing and never settling, hands spreading or stirring — a look this often
+  /// anyway. Waiting for a settled picture meant the mind never saw the spreading on his second PB&J (2026-10-30): it
+  /// woke only when he stopped, and he had to ask "how does this look?" to get anything.
+  public static let working = 5.0
   public static let heartbeat = 30.0
 
   private var reference: Thumb?
@@ -79,7 +83,8 @@ public struct Eyes: Sendable {
     if now.timeIntervalSince(lastEye) < Self.spacing - 1e-6 { return nil }
     guard let before = history.last(where: { $0.at <= now.addingTimeInterval(-1 + 1e-6) }) else { return nil }
     let steady = thumb.diff(before.thumb) <= Self.steady
-    return steady && thumb.diff(reference) >= Self.change ? .changed : nil
+    guard thumb.diff(reference) >= Self.change else { return nil }
+    return steady || now.timeIntervalSince(lastEye) >= Self.working - 1e-6 ? .changed : nil
   }
 
   /// The mind was called, shown `showing`. A spoken wake (`eye: false`) restarts the heartbeat, not the spacing.

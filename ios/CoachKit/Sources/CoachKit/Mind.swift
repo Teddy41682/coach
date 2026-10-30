@@ -121,7 +121,8 @@ public final class Mind {
     if step == .next && s.lastStep { step = .stay }
     if say != nil || step == .next {
       let landed = now()
-      if guardrails.allows(at: landed, cookSpeaking: s.cookSpeaking, coachSpeaking: s.coachSpeaking, finished: s.finished) {
+      if guardrails.allows(at: landed, cookSpeaking: s.cookSpeaking, coachSpeaking: s.coachSpeaking, finished: s.finished,
+                           movingOn: step == .next) {
         if say != nil { guardrails.spoke(at: landed) }
       } else {
         say = nil

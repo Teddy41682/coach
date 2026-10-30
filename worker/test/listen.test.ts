@@ -16,19 +16,23 @@ class Fake implements Sock {
 }
 const audio = (n: number) => new Uint8Array(n).buffer;
 const never = (() => 0) as unknown as typeof setTimeout;
+/** Lets the relay's audio queue run. */
+const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe("the relay to Muse", () => {
-  it("sends Muse our key first, holds the phone's audio until Muse answers, then pipes both ways", () => {
+  it("sends Muse our key first, holds the phone's audio until Muse answers, then pipes both ways", async () => {
     const phone = new Fake(), muse = new Fake();
     relay(phone, muse, "meta-key", 1000, never);
     expect(muse.sent).toEqual([museConfig("meta-key")]);
     const a = audio(4800);
     phone.fire("message", a);
+    await settle();
     expect(muse.sent).toHaveLength(1);
     muse.fire("message", '{"sessionId":"x"}');
     expect(muse.sent[1]).toBe(a);
     expect(phone.sent).toEqual(['{"sessionId":"x"}']);
     phone.fire("message", a);
+    await settle();
     muse.fire("message", '{"type":"speechComplete","transcript":"Is the pan hot?"}');
     expect(muse.sent).toHaveLength(3);
     expect(phone.sent[1]).toContain("Is the pan hot?");
@@ -49,10 +53,11 @@ describe("the relay to Muse", () => {
     m2.fire("error");
     expect(p2.closed?.code).toBe(1011);
   });
-  it("gives up when Muse never answers and the held audio piles up", () => {
+  it("gives up when Muse never answers and the held audio piles up", async () => {
     const phone = new Fake(), muse = new Fake();
     relay(phone, muse, "k", 1000, never);
     for (let i = 0; i * 4800 <= MAX_HELD_BYTES; i++) phone.fire("message", audio(4800));
+    await settle();
     expect(phone.closed?.reason).toBe("muse_silent");
   });
   it("passes the phone's audio only: a text frame closes it, and never reaches Muse", () => {
@@ -62,6 +67,17 @@ describe("the relay to Muse", () => {
     phone.fire("message", '{"authorization":{"accessToken":"Bearer theirs"}}');
     expect(muse.sent).toHaveLength(1);
     expect(phone.closed?.reason).toBe("audio_only");
+  });
+  it("sends a Blob frame on as its bytes, in order — never as text (his second PB&J: \"[object Blob]\")", async () => {
+    const phone = new Fake(), muse = new Fake();
+    relay(phone, muse, "k", 1000, never);
+    muse.fire("message", '{"sessionId":"x"}');
+    phone.fire("message", new Blob([new Uint8Array([1, 2])]) as never);
+    phone.fire("message", new Uint8Array([3, 4]).buffer);
+    await settle(); await settle();
+    const sent = muse.sent.slice(1);
+    expect(sent.every((m) => m instanceof ArrayBuffer)).toBe(true);
+    expect(sent.map((m) => [...new Uint8Array(m as ArrayBuffer)])).toEqual([[1, 2], [3, 4]]);
   });
   it("closes both after the longest cook", () => {
     const phone = new Fake(), muse = new Fake();

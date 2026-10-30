@@ -122,7 +122,7 @@ public final class CoachRunner {
       try await listener.start()
       if abandoned() { return }
       watchAudioRoute()
-      say("Let's make \(recipe.title). Step 1: \(steps.first?.text ?? "")")
+      say("Let's make \(recipe.title). First: \(steps.first?.text ?? "")")
       refresh()
       watchDevice()
       watch(session, mind)

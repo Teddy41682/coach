@@ -81,9 +81,13 @@ public final class CoachSession {
     stepIndex += 1; stepStartedAt = now(); speakStep()
   }
 
-  private func speakStep() {
+  /// "Next, spread the jelly…" rather than "Step 3: Spread the jelly…": a person beside you doesn't number the steps
+  /// (his second PB&J, 2026-10-30). The screen still shows the number.
+  private func speakStep(back: Bool = false) {
     guard steps.indices.contains(stepIndex) else { return }
-    say("Step \(stepIndex + 1): \(steps[stepIndex].text)")
+    let text = steps[stepIndex].text
+    if back { say("Back to step \(stepIndex + 1): \(text)"); return }
+    say(stepIndex == steps.count - 1 ? "Last one: \(text)" : "Next, \(text.prefix(1).lowercased() + text.dropFirst())")
   }
 
   public func handle(_ intent: Intent) async {
@@ -93,7 +97,7 @@ public final class CoachSession {
     case .previous:
       // Going back from the end is cooking again (an unprompted finish could otherwise never be undone).
       if phase == .finished { phase = .cooking }
-      stepIndex = max(0, stepIndex - 1); stepStartedAt = now(); speakStep()
+      stepIndex = max(0, stepIndex - 1); stepStartedAt = now(); speakStep(back: true)
     case .repeatStep:
       speakStep()
     case .done:

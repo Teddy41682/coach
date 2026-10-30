@@ -24,7 +24,8 @@ export function museConfig(key: string): string {
 }
 
 /** A Muse event for the log: its type and, for an error, its message — never a transcript (the cook's words). */
-export function museShape(data: string | ArrayBuffer): string {
+export function museShape(data: string | ArrayBuffer | Blob): string {
+  if (data instanceof Blob) return `blob ${data.size}`;
   if (typeof data !== "string") return `binary ${data.byteLength}`;
   try {
     const o = JSON.parse(data) as { type?: unknown; message?: unknown; sessionId?: unknown };
@@ -37,7 +38,7 @@ export function museShape(data: string | ArrayBuffer): string {
 export interface Sock {
   send(data: string | ArrayBuffer): void;
   close(code?: number, reason?: string): void;
-  addEventListener(type: "message", fn: (e: { data: string | ArrayBuffer }) => void): void;
+  addEventListener(type: "message", fn: (e: { data: string | ArrayBuffer | Blob }) => void): void;
   addEventListener(type: "close" | "error", fn: (e?: { code?: number; reason?: string }) => void): void;
 }
 
@@ -55,6 +56,18 @@ export function relay(
   let fromMuse = 0;
   let acked = false;
   let held: ArrayBuffer[] = [];
+  // Audio goes to Muse in arrival order, even when a frame has to be read out of a Blob first.
+  let queue: Promise<void> = Promise.resolve();
+  const toMuse = (data: ArrayBuffer | Blob) => {
+    queue = queue.then(async () => {
+      const bytes = data instanceof Blob ? await data.arrayBuffer() : data;
+      if (!open) return;
+      if (acked) { muse.send(bytes); return; }
+      heldBytes += bytes.byteLength;
+      if (heldBytes > MAX_HELD_BYTES) { end(1011, "muse_silent"); return; }
+      held.push(bytes);
+    }).catch(() => end(1011, "bad_audio"));
+  };
   let heldBytes = 0;
   const end = (code = 1000, reason = "") => {
     if (!open) return;
@@ -72,20 +85,17 @@ export function relay(
       for (const m of held) muse.send(m);
       held = [];
     }
-    phone.send(e.data);
+    // Muse speaks in JSON text; nothing else goes back to the phone.
+    if (typeof e.data === "string") phone.send(e.data);
   });
   phone.addEventListener("message", (e) => {
     if (!open) return;
-    if (++fromPhone <= 3) {
-      const d = e.data as unknown;
-      log(`phone ${fromPhone} ${typeof d} ${Object.prototype.toString.call(d)} ${typeof d === "string" ? d.length : (d as ArrayBuffer).byteLength}`);
-    }
+    if (++fromPhone <= 3) log(`phone ${fromPhone} ${museShape(e.data)}`);
     // Audio only: a text frame from the phone could re-configure Muse's session with our key behind it.
     if (typeof e.data === "string") { end(1003, "audio_only"); return; }
-    if (acked) { muse.send(e.data); return; }
-    heldBytes += e.data.byteLength;
-    if (heldBytes > MAX_HELD_BYTES) { end(1011, "muse_silent"); return; }
-    held.push(e.data);
+    // The deployed runtime hands the phone's binary frames over as Blobs (his second PB&J, 2026-10-30): sent on
+    // as-is, a Blob reached Muse as the text "[object Blob]" — "Malformed message", every time.
+    toMuse(e.data);
   });
   phone.addEventListener("close", () => end());
   phone.addEventListener("error", () => end(1011, "phone_error"));

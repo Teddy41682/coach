@@ -90,14 +90,14 @@ import Testing
     await s.handle(.previous)
     #expect(s.phase == .cooking)
     await s.handle(.next)
-    #expect(rig.said.last == "Step 2: Two.")
+    #expect(rig.said.last == "Last one: Two.")
   }
 
   @Test func nextSpeaksTheNextStepWithoutTheNetwork() async {
     let rig = Rig(); let s = rig.session()
     await s.handle(.next)
     #expect(s.stepIndex == 1)
-    #expect(rig.said.last == "Step 2: Add the eggs.")
+    #expect(rig.said.last == "Next, add the eggs.")
     #expect(rig.turns.isEmpty)
   }
 
@@ -112,7 +112,7 @@ import Testing
     let rig = Rig(); let s = rig.session()
     await s.handle(.previous)
     #expect(s.stepIndex == 0)
-    #expect(rig.said.last == "Step 1: Whisk the flour.")
+    #expect(rig.said.last == "Back to step 1: Whisk the flour.")
   }
 
   @Test func doneAsksTheCoachToCheckTheCurrentStepWithFrames() async {
@@ -123,7 +123,7 @@ import Testing
     #expect(rig.turns[0].stepIndex == 1)
     #expect(rig.turns[0].frames == ["F"])
     // The answer arrived at once, so the ack was never needed (spec: ack only on a real wait).
-    #expect(rig.said.suffix(2) == ["Step 2: Add the eggs.", "Looks good."])
+    #expect(rig.said.suffix(2) == ["Next, add the eggs.", "Looks good."])
   }
 
   @Test func doneReviewsTheWholeStepAQuestionLooksNow() async {
@@ -181,7 +181,7 @@ import Testing
     let s = rig.session()
     await s.handle(.question("is it drained?"))
     #expect(s.stepIndex == 1)
-    #expect(rig.said.suffix(2) == ["That's drained, nice.", "Step 2: Add the eggs."])
+    #expect(rig.said.suffix(2) == ["That's drained, nice.", "Next, add the eggs."])
   }
 
   @Test func stayStaysPut() async {
