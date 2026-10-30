@@ -39,7 +39,20 @@ private final class MuseFeed: @unchecked Sendable {
     set { lock.withLock { open = newValue } }
   }
 
-  func attach(_ s: URLSessionWebSocketTask?) { lock.withLock { socket = s; chunker = PCMChunker() } }
+  func attach(_ s: URLSessionWebSocketTask?) { lock.withLock { socket = s; chunker = PCMChunker(); lastSent = Date() } }
+
+  /// When audio last went to Muse. Muse closes a stream that falls behind real time ("Ingress audio slower than
+  /// real-time", 1008 — his sixth PB&J, when a phone call took the microphone), so gaps are filled with silence.
+  private var lastSent = Date()
+
+  func keepAlive(now: Date) {
+    lock.withLock {
+      guard let socket, now.timeIntervalSince(lastSent) >= 0.25 else { return }
+      let frames = min(Int(now.timeIntervalSince(lastSent) / 0.1), 10)
+      for _ in 0..<frames { socket.send(.data(Data(count: PCMChunker.frameBytes))) { _ in } }
+      lastSent = now
+    }
+  }
 
   func feed(_ buffer: AVAudioPCMBuffer) {
     lock.withLock {
@@ -61,6 +74,7 @@ private final class MuseFeed: @unchecked Sendable {
       let count = Int(out.frameLength) * 2
       let bytes = open ? Data(bytes: samples[0], count: count) : Data(count: count)
       for frame in chunker.add(bytes) { socket.send(.data(frame)) { _ in } }
+      lastSent = Date()
     }
   }
 }
@@ -133,8 +147,40 @@ public final class Listener {
       self.restart()
     }
     if socket == nil { restart() }
+    watchInterruptions()
     ticker = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.tick() }
+    }
+  }
+
+  private var interruptions: [Task<Void, Never>] = []
+
+  /// A phone call (or Siri, or another app's audio) stops the microphone engine and iOS does not start it again: on his
+  /// sixth PB&J the coach went deaf after a call and never heard him again. When the interruption ends, or the route
+  /// changes under the engine, the session is re-activated and the engine restarted with a fresh tap.
+  private func watchInterruptions() {
+    interruptions = [AVAudioSession.interruptionNotification, .AVAudioEngineConfigurationChange].map { name in
+      Task { [weak self] in
+        for await _ in NotificationCenter.default.notifications(named: name) {
+          try? await Task.sleep(for: .milliseconds(500))
+          guard let self, !self.stopped else { return }
+          self.resume()
+        }
+      }
+    }
+  }
+
+  private func resume() {
+    guard !stopped, !engine.isRunning else { return }
+    do {
+      try AVAudioSession.sharedInstance().setActive(true)
+      engine.inputNode.removeTap(onBus: 0)
+      Self.tap(engine.inputNode, into: box, feed: feed)
+      engine.prepare()
+      try engine.start()
+      onNote?("ears: microphone back after an interruption")
+    } catch {
+      onNote?("ears: microphone could not restart — \(error.localizedDescription)")
     }
   }
 
@@ -195,6 +241,7 @@ public final class Listener {
 
   public func stop() {
     stopped = true
+    interruptions.forEach { $0.cancel() }
     receiving?.cancel()
     socket?.cancel(with: .normalClosure, reason: nil)
     feed.attach(nil); socket = nil
@@ -241,6 +288,8 @@ public final class Listener {
 
   private func tick() {
     feed.gate = gate.open(coachTalking: speaker.isSpeaking, coachStoppedAt: speaker.lastFinished, now: Date())
+    feed.keepAlive(now: Date())
+    if !engine.isRunning, !stopped { resume() }
     guard socket == nil else { return }
     if let said = endpointer.tick(at: Date()) {
       emit.yield(said)

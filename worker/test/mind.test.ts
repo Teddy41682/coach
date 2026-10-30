@@ -117,3 +117,16 @@ describe("the mind's judgement, v7 (his fourth PB&J: 'talking so fast')", () => 
     expect(s).toContain("opens with your hello");
   });
 });
+
+describe("the mind's judgement, v8 (his sixth PB&J: tortillas passed as bread)", () => {
+  it("puts the coach in charge: checks against the recipe, directs the fix, never calls a wrong step done", async () => {
+    const { mindSystem } = await import("../src/expertise/mind-prompt");
+    const ctx = { sessionId: "s", stepIndex: 0, wake: "changed", timeline: [], quietFor: 0,
+      recipe: { title: "PB&J", ingredients: [], steps: ["Lay two slices of bread on a plate."] }, stepIngredients: [],
+      briefing: { done: "", mistakes: "", tip: "", hardToSee: false } } as never;
+    const s = mindSystem(ctx, false);
+    expect(s).toContain("You are the chef in charge");
+    expect(s).toContain("Tortillas are not sandwich bread");
+    expect(s).toContain("Never call a step done because the cook says so");
+  });
+});

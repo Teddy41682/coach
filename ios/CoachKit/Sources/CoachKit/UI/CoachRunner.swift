@@ -161,8 +161,12 @@ public final class CoachRunner {
         heardAt = Date()
         let intent = parseIntent(words)
         // Speaking means they're here; their words join the timeline the mind is woken with.
-        if intent != .ignore { mind.note(.cook, words) }
-        mind.cookSpoke(at: Date(), showing: newest()?.thumb)
+        // A bare "okay" is not a turn: it must not throw away what the eyes were about to say. On his sixth PB&J
+        // "That landed on the plate" was dropped because he'd said "Okay." a second before, and came 12 s late.
+        if intent != .ignore {
+          mind.note(.cook, words)
+          mind.cookSpoke(at: Date(), showing: newest()?.thumb)
+        }
         away = mind.held
         activity = .thinking
         turning = true
