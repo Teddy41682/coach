@@ -8,11 +8,15 @@
  */
 export const MUSE_ASR_URL = "https://api.meta.ai/v1/asr/realtime";
 /**
- * One socket lives at most 30 minutes and is charged its worst case up front — 9¢ (Muse is $0.18 an hour) — against
- * the device's and the day's caps, so held-open sockets can't spend past them. A longer cook's phone opens another.
+ * One socket lives at most 30 minutes. It reserves its worst case up front — 9¢ (Muse is $0.18 an hour, 0.3¢ a
+ * minute) — against the day's cap, so held-open sockets can't spend past it, and settles to its real length when it
+ * closes. It is counted with the looks, not the turns: his first PB&J's ~100 broken reconnects each took one of the
+ * device's 150 daily turns, and by his fifth the coach answered "I've reached today's limit".
  */
 export const LISTEN_MAX_MS = 30 * 60 * 1000;
-export const LISTEN_CENTS = 9;
+export const LISTEN_RESERVE_MILLICENTS = 9_000;
+/** 0.3¢ a minute, never below 0.1¢ a socket. */
+export const listenMillicents = (ms: number) => Math.max(100, Math.ceil((ms / 60_000) * 300));
 /** Audio held while Muse acknowledges the config: ~10 s at 48 KB/s. More than that and the relay gives up. */
 export const MAX_HELD_BYTES = 500_000;
 
@@ -48,7 +52,9 @@ export interface Sock {
  */
 export function relay(
   phone: Sock, muse: Sock, key: string, maxMs = LISTEN_MAX_MS, setTimer = setTimeout, log: (line: string) => void = () => {},
+  onEnd: (openMs: number) => void = () => {}, now: () => number = Date.now,
 ): void {
+  const opened = now();
   let open = true;
   // What crossed, for `wrangler tail` (his first PB&J, 2026-10-30: Muse answered "Malformed message" ~0.2 s after
   // every connect). Never the config: it carries our key.
@@ -73,6 +79,7 @@ export function relay(
     if (!open) return;
     open = false;
     log(`listen end ${code} ${reason} phone=${fromPhone} muse=${fromMuse}`);
+    onEnd(now() - opened);
     try { phone.close(code, reason); } catch {}
     try { muse.close(code, reason); } catch {}
   };

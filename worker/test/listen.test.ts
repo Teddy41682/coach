@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import worker, { type Deps } from "../src/index";
-import { LISTEN_CENTS, MAX_HELD_BYTES, museConfig, museShape, relay, type Sock } from "../src/listen";
+import { LISTEN_RESERVE_MILLICENTS, listenMillicents, MAX_HELD_BYTES, museConfig, museShape, relay, type Sock } from "../src/listen";
 import { GLOBAL_DAILY_CENTS, hstDay, MemoryUsageStore } from "../src/limits";
 import { MemorySessionStore } from "../src/session";
 
@@ -117,10 +117,31 @@ describe("the /v1/listen door", () => {
     expect((await worker.handle(get(H), env, d)).status).toBe(429);
     expect(d.asked).toBe(0);
   });
-  it("charges each socket its worst case before Muse is opened", async () => {
+  it("reserves a socket's worst case before Muse is opened, gives it back when Muse won't open, and takes no turn", async () => {
     const usage = new MemoryUsageStore();
-    await worker.handle(get(H), env, deps(null, usage));
-    expect(await usage.totalCents(hstDay(Date.now()))).toBe(LISTEN_CENTS);
+    let reserved = -1;
+    const spy = Object.assign(Object.create(usage), {
+      tryObserve: async (...a: Parameters<MemoryUsageStore["tryObserve"]>) => { reserved = a[4]; return usage.tryObserve(...a); },
+    });
+    expect((await worker.handle(get(H), env, deps(null, spy))).status).toBe(502);
+    expect(reserved).toBe(LISTEN_RESERVE_MILLICENTS);
+    expect(await usage.totalCents(hstDay(Date.now()))).toBe(0);
+    // 150 sockets later the device still has every one of its turns.
+    for (let i = 0; i < 150; i++) await worker.handle(get(H), env, deps(null, usage));
+    expect(await usage.tryAdd(hstDay(Date.now()), "dev-1", 1, 150, 1_500)).toBe("ok");
+  });
+  it("settles a socket to its real length: 0.3¢ a minute, at least 0.1¢", () => {
+    expect(listenMillicents(0)).toBe(100);
+    expect(listenMillicents(3 * 60_000)).toBe(900);
+    expect(listenMillicents(30 * 60_000)).toBe(LISTEN_RESERVE_MILLICENTS);
+  });
+  it("tells its owner how long it was open when it ends", () => {
+    const phone = new Fake(), muse = new Fake();
+    let t = 1_000, openMs = -1;
+    relay(phone, muse, "k", 1000, never, () => {}, (ms) => { openMs = ms; }, () => t);
+    t = 181_000;
+    phone.fire("close");
+    expect(openMs).toBe(180_000);
   });
   it("says so when Muse won't open", async () => {
     expect((await worker.handle(get(H), env, deps(null))).status).toBe(502);

@@ -4,7 +4,7 @@ import { linkSteps } from "./link";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
 import { realMillicents, settleObserve } from "./limits";
-import { checkAndCount, checkObserve, costOf, D1UsageStore, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
+import { checkAndCount, checkObserve, costOf, D1UsageStore, DEVICE_DAILY_OBSERVES, GLOBAL_DAILY_CENTS, hstDay, LIMIT_LINE, LINK_CENTS, type UsageStore } from "./limits";
 import { observeFrame } from "./observe";
 import { isMindRequest, wakeMind, type MindContext } from "./mind";
 import { mindSystem, mindUser } from "./expertise/mind-prompt";
@@ -14,7 +14,7 @@ import { D1SessionStore, type SessionStore } from "./session";
 import { encodeEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
 import { verifyToken } from "./token";
-import { LISTEN_CENTS, MUSE_ASR_URL, relay, type Sock } from "./listen";
+import { LISTEN_RESERVE_MILLICENTS, listenMillicents, MUSE_ASR_URL, relay, type Sock } from "./listen";
 
 export interface Env {
   MODEL_API_KEY: string;
@@ -266,13 +266,20 @@ async function listen(request: Request, env: Env, deps: Deps): Promise<Response>
   const device = who.caller ?? deviceOf(request);
   if (!device) return bad(400, "no_device");
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return bad(426, "websocket_only");
-  // Charged its worst case before Muse is opened, against the device's and the day's caps (`listen.ts`).
-  if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), LISTEN_CENTS)) !== "ok") return bad(429, "daily_limit");
+  // Its worst case reserved before Muse is opened, counted with the looks; settled to its real length on close.
+  const day = hstDay(deps.now());
+  if ((await deps.usage.tryObserve(day, device, DEVICE_DAILY_OBSERVES, GLOBAL_DAILY_CENTS, LISTEN_RESERVE_MILLICENTS)) !== "ok") {
+    return bad(429, "daily_limit");
+  }
   const muse = await deps.muse?.();
-  if (!muse) return bad(502, "no_transcriber");
+  if (!muse) {
+    await deps.usage.chargeMillicents(day, -LISTEN_RESERVE_MILLICENTS);
+    return bad(502, "no_transcriber");
+  }
   const [phone, server] = Object.values(new WebSocketPair());
   server.accept();
-  relay(server as unknown as Sock, muse, env.MODEL_API_KEY, undefined, undefined, (l) => console.log(l));
+  relay(server as unknown as Sock, muse, env.MODEL_API_KEY, undefined, undefined, (l) => console.log(l),
+    (ms) => { void deps.usage.chargeMillicents(day, listenMillicents(ms) - LISTEN_RESERVE_MILLICENTS); });
   return new Response(null, { status: 101, webSocket: phone });
 }
 

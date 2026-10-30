@@ -39,6 +39,9 @@ export function runTurn(
   return new ReadableStream({
     async start(controller) {
       const send = (e: CoachEvent) => controller.enqueue(encodeEvent(e));
+      // Timings for `wrangler tail` (his fifth PB&J: "you can feel the delay") — never the words.
+      const t0 = Date.now();
+      let firstWord = 0;
       if (req.frames.length > 0) send({ type: "ack", text: ACKS[req.stepIndex % ACKS.length] });
 
       const abort = new AbortController();
@@ -55,12 +58,16 @@ export function runTurn(
           const next = await Promise.race([it.next(), timedOut]);
           if (next.done) break;
           const speak = control.push(next.value);
-          if (speak) send({ type: "text", text: speak });
+          if (speak) {
+            if (!firstWord) firstWord = Date.now() - t0;
+            send({ type: "text", text: speak });
+          }
         }
         const end = control.end();
         if (end.speak) send({ type: "text", text: end.speak });
         send({ type: "action", action: end.action });
         send({ type: "done" });
+        console.log(`turn first-word ${firstWord || Date.now() - t0} ms, done ${Date.now() - t0} ms, frames ${req.frames.length}`);
       } catch (error) {
         // The cook hears an apology; the log keeps the cause, or a failing model would look like silence.
         console.error("turn failed", req.sessionId, req.stepIndex, error instanceof Error ? error.message : String(error));
