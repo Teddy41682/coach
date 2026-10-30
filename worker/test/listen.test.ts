@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import worker, { type Deps } from "../src/index";
-import { LISTEN_CENTS, MAX_HELD_BYTES, museConfig, relay, type Sock } from "../src/listen";
+import { LISTEN_CENTS, MAX_HELD_BYTES, museConfig, museShape, relay, type Sock } from "../src/listen";
 import { GLOBAL_DAILY_CENTS, hstDay, MemoryUsageStore } from "../src/limits";
 import { MemorySessionStore } from "../src/session";
 
@@ -108,5 +108,14 @@ describe("the /v1/listen door", () => {
   });
   it("says so when Muse won't open", async () => {
     expect((await worker.handle(get(H), env, deps(null))).status).toBe(502);
+  });
+});
+
+describe("what the relay logs", () => {
+  it("names Muse's events, never the cook's words", () => {
+    expect(museShape('{"type":"speechComplete","transcript":"my secret recipe"}')).toBe("speechComplete");
+    expect(museShape('{"type":"error","message":"Malformed message"}')).toBe("error Malformed message");
+    expect(museShape('{"sessionId":"x"}')).toBe("ack");
+    expect(museShape(new ArrayBuffer(8))).toBe("binary 8");
   });
 });

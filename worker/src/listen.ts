@@ -23,6 +23,16 @@ export function museConfig(key: string): string {
   });
 }
 
+/** A Muse event for the log: its type and, for an error, its message — never a transcript (the cook's words). */
+export function museShape(data: string | ArrayBuffer): string {
+  if (typeof data !== "string") return `binary ${data.byteLength}`;
+  try {
+    const o = JSON.parse(data) as { type?: unknown; message?: unknown; sessionId?: unknown };
+    if (o.type === "error") return `error ${String(o.message).slice(0, 120)}`;
+    return o.type ? String(o.type).slice(0, 40) : o.sessionId ? "ack" : "untyped";
+  } catch { return "not json"; }
+}
+
 /** The two sockets as the relay uses them, so tests can hand it fakes. */
 export interface Sock {
   send(data: string | ArrayBuffer): void;
@@ -56,9 +66,7 @@ export function relay(
   muse.send(museConfig(key));
   muse.addEventListener("message", (e) => {
     if (!open) return;
-    if (++fromMuse <= 6 || typeof e.data !== "string" || e.data.includes('"error"')) {
-      log(`muse ${fromMuse} ${typeof e.data === "string" ? e.data.slice(0, 200) : `binary ${e.data.byteLength}`}`);
-    }
+    if (++fromMuse <= 6 || typeof e.data !== "string" || e.data.includes('"error"')) log(`muse ${fromMuse} ${museShape(e.data)}`);
     if (!acked) {
       acked = true;
       for (const m of held) muse.send(m);
