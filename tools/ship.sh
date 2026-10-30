@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED="$HOME/Library/Developer/Xcode/DerivedData/coachdemo-drill"
 
 echo "== tests"
-(cd "$ROOT/worker" && npx tsc --noEmit && npx vitest run --reporter=dot | tail -3)
+(cd "$ROOT/worker" && npx tsc --noEmit && npx vitest run --silent 2>&1 | grep -E "Tests |FAIL")
 (cd "$ROOT/ios/CoachKit" && swift test 2>&1 | grep -E "Test run|✘" | tail -5; exit "${PIPESTATUS[0]}")
 
 echo "== worker"
