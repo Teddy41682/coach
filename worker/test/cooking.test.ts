@@ -92,7 +92,8 @@ describe("the cooking pack", () => {
     expect(s).toContain("ask them to show you");
     expect(s).toContain("Never repeat a tip you already gave");
     expect(s).toContain("don't say what the next step is");
-    expect(s).toContain("Only add a tip when it really helps");
+    expect(s).toContain("Answer like a chef who knows this food deeply");
+    expect(s).toContain("Be honest about what the photos show");
     expect(s).toContain("Vary your words");
   });
 

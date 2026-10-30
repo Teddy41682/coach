@@ -210,6 +210,20 @@ import Testing
     #expect(rig.said == ["Fine."])
   }
 
+  /// His first PB&J: answers land ~2 s after his words, and an ack before each one sounded like a machine.
+  @Test func aTwoSecondAnswerHasNoAck() async {
+    let rig = Rig(); rig.useManual = true
+    let s = rig.session()
+    let turn = Task { await s.handle(.question("how's that?")) }
+    while rig.manual == nil { await Task.yield() }
+    rig.manual?.yield(.ack("Let me see."))
+    for _ in 0..<5 { await Task.yield() }
+    rig.advance(2.0)
+    rig.manual?.yield(.text("Spread right to the edges.")); rig.manual?.yield(.action(.stay)); rig.manual?.yield(.done); rig.manual?.finish()
+    await turn.value
+    #expect(rig.said == ["Spread right to the edges."])
+  }
+
   @Test func aSlowAnswerIsCoveredByTheAck() async {
     let rig = Rig(); rig.useManual = true
     let s = rig.session()
@@ -217,7 +231,7 @@ import Testing
     while rig.manual == nil { await Task.yield() }
     rig.manual?.yield(.ack("Let me see."))
     for _ in 0..<5 { await Task.yield() }
-    rig.advance(1.4)
+    rig.advance(CoachSession.ackDelay + 0.1)
     rig.manual?.yield(.text("Fine."))
     rig.manual?.yield(.action(.stay)); rig.manual?.yield(.done); rig.manual?.finish()
     await turn.value
@@ -234,7 +248,7 @@ import Testing
     while rig.manual == nil { await Task.yield() }
     rig.manual?.yield(.ack("Let me take a look."))
     for _ in 0..<5 { await Task.yield() }
-    rig.advance(1.4)
+    rig.advance(CoachSession.ackDelay + 0.1)
     rig.manual?.yield(.text("Fine.")); rig.manual?.yield(.action(.stay)); rig.manual?.yield(.done); rig.manual?.finish()
     await turn.value
   }

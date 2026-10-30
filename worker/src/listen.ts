@@ -28,27 +28,37 @@ export interface Sock {
   send(data: string | ArrayBuffer): void;
   close(code?: number, reason?: string): void;
   addEventListener(type: "message", fn: (e: { data: string | ArrayBuffer }) => void): void;
-  addEventListener(type: "close" | "error", fn: () => void): void;
+  addEventListener(type: "close" | "error", fn: (e?: { code?: number; reason?: string }) => void): void;
 }
 
 /**
  * Pipes the phone's socket to Muse's. The config (with our key) goes first; the phone's audio is held until Muse
  * acknowledges it, then flows. Whichever side closes, the other is closed; nothing outlives `maxMs`.
  */
-export function relay(phone: Sock, muse: Sock, key: string, maxMs = LISTEN_MAX_MS, setTimer = setTimeout): void {
+export function relay(
+  phone: Sock, muse: Sock, key: string, maxMs = LISTEN_MAX_MS, setTimer = setTimeout, log: (line: string) => void = () => {},
+): void {
   let open = true;
+  // What crossed, for `wrangler tail` (his first PB&J, 2026-10-30: Muse answered "Malformed message" ~0.2 s after
+  // every connect). Never the config: it carries our key.
+  let fromPhone = 0;
+  let fromMuse = 0;
   let acked = false;
   let held: ArrayBuffer[] = [];
   let heldBytes = 0;
   const end = (code = 1000, reason = "") => {
     if (!open) return;
     open = false;
+    log(`listen end ${code} ${reason} phone=${fromPhone} muse=${fromMuse}`);
     try { phone.close(code, reason); } catch {}
     try { muse.close(code, reason); } catch {}
   };
   muse.send(museConfig(key));
   muse.addEventListener("message", (e) => {
     if (!open) return;
+    if (++fromMuse <= 6 || typeof e.data !== "string" || e.data.includes('"error"')) {
+      log(`muse ${fromMuse} ${typeof e.data === "string" ? e.data.slice(0, 200) : `binary ${e.data.byteLength}`}`);
+    }
     if (!acked) {
       acked = true;
       for (const m of held) muse.send(m);
@@ -58,6 +68,10 @@ export function relay(phone: Sock, muse: Sock, key: string, maxMs = LISTEN_MAX_M
   });
   phone.addEventListener("message", (e) => {
     if (!open) return;
+    if (++fromPhone <= 3) {
+      const d = e.data as unknown;
+      log(`phone ${fromPhone} ${typeof d} ${Object.prototype.toString.call(d)} ${typeof d === "string" ? d.length : (d as ArrayBuffer).byteLength}`);
+    }
     // Audio only: a text frame from the phone could re-configure Muse's session with our key behind it.
     if (typeof e.data === "string") { end(1003, "audio_only"); return; }
     if (acked) { muse.send(e.data); return; }
@@ -67,7 +81,7 @@ export function relay(phone: Sock, muse: Sock, key: string, maxMs = LISTEN_MAX_M
   });
   phone.addEventListener("close", () => end());
   phone.addEventListener("error", () => end(1011, "phone_error"));
-  muse.addEventListener("close", () => end());
+  muse.addEventListener("close", (e?: { code?: number; reason?: string }) => end(1000, `muse closed ${e?.code ?? ""} ${e?.reason ?? ""}`));
   muse.addEventListener("error", () => end(1011, "muse_error"));
   setTimer(() => end(1000, "too_long"), maxMs);
 }

@@ -87,6 +87,10 @@ public final class Listener {
   private var museHearing = false
   private var stopped = false
   private let gate = EchoGate()
+  /// Reconnects allowed in one cook. His first PB&J reconnected ~100 times (Muse refused every connection), and each
+  /// socket is charged 9¢ against the day's cap; past this the phone hears.
+  static let maxReconnects = 2
+  private var reconnects = 0
   /// Which ears are on, and why they changed — for the recording (`CoachRunner` notes it).
   public var onNote: ((String) -> Void)?
 
@@ -152,6 +156,7 @@ public final class Listener {
           self?.heard(MuseEvent.decode(text))
         }
       } catch {
+        self?.onNote?("muse closed: \(s.closeCode.rawValue) \(s.closeReason.map { String(decoding: $0, as: UTF8.self) } ?? "") \(error.localizedDescription)")
         await self?.lost()
       }
     }
@@ -173,7 +178,8 @@ public final class Listener {
   private func lost() async {
     guard !stopped else { return }
     feed.attach(nil); socket = nil; museHearing = false
-    if let client, let s = try? await client.listen(), !stopped {
+    reconnects += 1
+    if reconnects <= Self.maxReconnects, let client, let s = try? await client.listen(), !stopped {
       use(s)
       onNote?("ears: muse reconnected")
       return

@@ -32,8 +32,9 @@ public final class CoachSession {
     "Give me a second.", "Let's see.", "Okay, one moment.", "Let me look.", "Right, let's see.",
     "Hang on, looking.", "Just a sec.",
   ]
-  /// Answers take 1.5–3 s: an ack is only spoken if nothing has started by then…
-  static let ackDelay = 1.3
+  /// An ack is only spoken when an answer is really stuck. 1.3 s spoke one before most answers — 0–0.4 s before the
+  /// answer itself on his first PB&J (2026-10-30), and "one sec" sounded wrong: a person just looks for two seconds.
+  static let ackDelay = 4.0
   /// …and not again within this long of the last one.
   static let ackCooldown = 15.0
   private var pendingAck: UUID?

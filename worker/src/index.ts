@@ -272,7 +272,7 @@ async function listen(request: Request, env: Env, deps: Deps): Promise<Response>
   if (!muse) return bad(502, "no_transcriber");
   const [phone, server] = Object.values(new WebSocketPair());
   server.accept();
-  relay(server as unknown as Sock, muse, env.MODEL_API_KEY);
+  relay(server as unknown as Sock, muse, env.MODEL_API_KEY, undefined, undefined, (l) => console.log(l));
   return new Response(null, { status: 101, webSocket: phone });
 }
 

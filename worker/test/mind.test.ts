@@ -89,3 +89,16 @@ describe("isMindRequest", () => {
     expect(isMindRequest({ ...ok, frame: "not base64!" })).toBe(false);
   });
 });
+
+describe("the mind's judgement, v4 (his first PB&J, 2026-10-30)", () => {
+  it("lets the coach lean over with one expert touch a step, and keeps it honest", async () => {
+    const { mindSystem } = await import("../src/expertise/mind-prompt");
+    const ctx = { sessionId: "s", stepIndex: 0, wake: "changed", timeline: [], quietFor: 0,
+      recipe: { title: "PB&J", ingredients: [], steps: ["Spread it."] }, stepIngredients: [],
+      briefing: { done: "", mistakes: "", tip: "", hardToSee: false } } as never;
+    const s = mindSystem(ctx, false);
+    expect(s).toContain("about once a step");
+    expect(s).toContain("Be honest about what the photos show");
+    expect(s).not.toContain("Unprompted is never for tips");
+  });
+});
