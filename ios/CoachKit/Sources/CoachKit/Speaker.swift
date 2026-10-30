@@ -37,7 +37,9 @@ public final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     let u = AVSpeechUtterance(string: line)
     u.voice = chosenVoice
     u.rate = AVSpeechUtteranceDefaultSpeechRate * 0.88
-    u.postUtteranceDelay = 0.35
+    // No breath after an opening clause ("Two slices side by side —"): the rest follows straight on. With one, his
+    // eighth PB&J heard "Glad to hear it — … good to be cooking with you." as two halting pieces.
+    u.postUtteranceDelay = [",", "—", ";"].contains(where: line.hasSuffix) ? 0 : 0.35
     return u
   }
 

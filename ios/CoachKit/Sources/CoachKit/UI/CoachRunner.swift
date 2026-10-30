@@ -51,7 +51,7 @@ public final class CoachRunner {
         let waited = Date().timeIntervalSince(since)
         if (self.heardHello && waited >= 0.6) || waited >= Self.helloWait {
           self.opening = false
-          self.say("Right, let's make \(self.recipe.title). First, \(first.prefix(1).lowercased() + first.dropFirst())")
+          self.say("Right — today's recipe is \(self.recipe.title). First, \(first.prefix(1).lowercased() + first.dropFirst())")
           return
         }
       }
@@ -61,8 +61,11 @@ public final class CoachRunner {
   /// Set when this session is being recorded.
   public let recorder: SessionRecorder?
 
-  public init(recipe: CoachRecipe, device: CoachDevice, client: CoachClient, recorder: SessionRecorder? = nil) {
-    self.recipe = recipe; self.device = device; self.client = client; self.recorder = recorder
+  /// The coach's own name, said when it introduces itself ("Hi, I'm Serena"); nil, it introduces itself without one.
+  public let name: String?
+
+  public init(recipe: CoachRecipe, device: CoachDevice, client: CoachClient, recorder: SessionRecorder? = nil, name: String? = nil) {
+    self.recipe = recipe; self.device = device; self.client = client; self.recorder = recorder; self.name = name
   }
 
   private var stopped = false
@@ -150,7 +153,8 @@ public final class CoachRunner {
       // A hello, then a real pause for his answer before the recipe starts (his fourth PB&J: the question and the
       // first step came in one breath, with no room to answer). His answer is a spoken turn; the mind chats back.
       opening = true
-      say("Hey — how's your day going?")
+      // A proper introduction (his eighth PB&J): who it is, what it's here for, then the question.
+      say("Hi\(name.map { ", I'm \($0)" } ?? "") — I'll be your cooking coach today. How's your day going?")
       startAfterHello(first: steps.first?.text ?? "")
       refresh()
       watchDevice()

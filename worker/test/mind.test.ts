@@ -114,7 +114,7 @@ describe("the mind's judgement, v7 (his fourth PB&J: 'talking so fast')", () => 
     expect(s).toContain("calm, unhurried adult");
     expect(s).toContain("Never follow up on your own last line");
     expect(s).toContain("Never invent a problem");
-    expect(s).toContain("opens with your hello");
+    expect(s).toContain("opens with you introducing yourself");
   });
 });
 
@@ -141,5 +141,18 @@ describe("the mind's judgement, v9 (his seventh PB&J: 'too quiet a lot of the ti
     expect(s).toContain("coach at their shoulder");
     expect(s).toContain("Only claim to see what is in the newest photo");
     expect(s).toContain("never contradict it: One firm press straight down");
+  });
+});
+
+describe("the mind's judgement, v10 (his eighth PB&J: 'some opportunity for humor')", () => {
+  it("has a dry, kind humour and never restates a cue", async () => {
+    const { mindSystem } = await import("../src/expertise/mind-prompt");
+    const ctx = { sessionId: "s", stepIndex: 0, wake: "changed", timeline: [], quietFor: 0,
+      recipe: { title: "PB&J", ingredients: [], steps: ["Spread it."] }, stepIngredients: [],
+      briefing: { done: "", mistakes: "", tip: "", hardToSee: false } } as never;
+    const s = mindSystem(ctx, false);
+    expect(s).toContain("dry, warm sense of humour");
+    expect(s).toContain("Never at the cook's expense");
+    expect(s).toContain("don't repeat a cue in new words");
   });
 });

@@ -26,7 +26,8 @@ struct PickView: View {
       base: URL(string: info["CoachWorkerURL"] as? String ?? "")!,
       appKey: info["CoachAppKey"] as? String ?? "",
       device: UIDevice.current.identifierForVendor?.uuidString ?? "unknown")
-    runner = CoachRunner(recipe: Recipes.all[pick], device: device, client: client, recorder: record ? try? SessionRecorder() : nil)
+    runner = CoachRunner(recipe: Recipes.all[pick], device: device, client: client, recorder: record ? try? SessionRecorder() : nil,
+                          name: "Serena")
   }
 
   var body: some View {
