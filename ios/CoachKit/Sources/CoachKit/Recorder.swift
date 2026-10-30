@@ -64,8 +64,7 @@ public final class SessionRecorder {
   private func render(_ text: String, at date: Date) {
     let url = folder.appending(path: "said/" + RecordingLog.frameName(at: date.timeIntervalSince(log.start))
       .replacingOccurrences(of: ".jpg", with: ".caf"))
-    let u = AVSpeechUtterance(string: text)
-    u.voice = Speaker.chosenVoice
+    let u = Speaker.utterance(text)
     Self.render(u, with: renderer, to: SaidFile(url: url))
   }
 

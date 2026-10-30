@@ -103,3 +103,17 @@ describe("the mind's judgement, v4 (his first PB&J, 2026-10-30)", () => {
     expect(s).not.toContain("Unprompted is never for tips");
   });
 });
+
+describe("the mind's judgement, v7 (his fourth PB&J: 'talking so fast')", () => {
+  it("asks for an unhurried rhythm, no follow-ups on itself, nothing invented, and lets the hello breathe", async () => {
+    const { mindSystem } = await import("../src/expertise/mind-prompt");
+    const ctx = { sessionId: "s", stepIndex: 0, wake: "spoke", timeline: [], quietFor: 0,
+      recipe: { title: "PB&J", ingredients: [], steps: ["Spread it."] }, stepIngredients: [],
+      briefing: { done: "", mistakes: "", tip: "", hardToSee: false } } as never;
+    const s = mindSystem(ctx, true);
+    expect(s).toContain("calm, unhurried adult");
+    expect(s).toContain("Never follow up on your own last line");
+    expect(s).toContain("Never invent a problem");
+    expect(s).toContain("opens with your hello");
+  });
+});

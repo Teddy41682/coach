@@ -24,10 +24,18 @@ public final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     synth.delegate = self
   }
 
-  public func say(_ line: String) {
+  /// The system's default rate sounded rushed on his fourth PB&J (2026-10-30, "talking so fast"): a little slower,
+  /// with a breath after each sentence. The recorder renders with the same settings, so the video matches what he heard.
+  public static func utterance(_ line: String) -> AVSpeechUtterance {
     let u = AVSpeechUtterance(string: line)
-    u.voice = voice
-    u.rate = AVSpeechUtteranceDefaultSpeechRate
+    u.voice = chosenVoice
+    u.rate = AVSpeechUtteranceDefaultSpeechRate * 0.88
+    u.postUtteranceDelay = 0.35
+    return u
+  }
+
+  public func say(_ line: String) {
+    let u = Self.utterance(line)
     isSpeaking = true
     synth.speak(u)
   }

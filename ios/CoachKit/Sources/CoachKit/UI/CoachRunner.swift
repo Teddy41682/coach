@@ -34,6 +34,30 @@ public final class CoachRunner {
   private var observing: Task<Void, Never>?
   private var routes: Task<Void, Never>?
   private var lastLoggedStep = 0
+  /// From the hello until the recipe starts: the eyes keep quiet, so nothing talks over his answer.
+  private var opening = false
+  private var heardHello = false
+
+  /// The recipe starts once he has answered and been answered — or after `helloWait` seconds of quiet.
+  static let helloWait = 7.0
+  private func startAfterHello(first: String) {
+    Task { [weak self] in
+      var quietSince: Date?
+      while let self, !self.stopped {
+        try? await Task.sleep(for: .milliseconds(200))
+        let busy = self.speaker.isSpeaking || self.turning || (self.listener?.isHearing ?? false)
+        if busy { quietSince = nil; continue }
+        let since = quietSince ?? Date(); quietSince = since
+        let waited = Date().timeIntervalSince(since)
+        if (self.heardHello && waited >= 0.6) || waited >= Self.helloWait {
+          self.opening = false
+          self.say("Right, let's make \(self.recipe.title). First, \(first.prefix(1).lowercased() + first.dropFirst())")
+          return
+        }
+      }
+    }
+  }
+
   /// Set when this session is being recorded.
   public let recorder: SessionRecorder?
 
@@ -122,13 +146,17 @@ public final class CoachRunner {
       try await listener.start()
       if abandoned() { return }
       watchAudioRoute()
-      // A hello first, like a person (his third PB&J): his answer is a spoken turn, and the mind chats back.
-      say("Hey — how's your day going? We're making \(recipe.title) today. First: \(steps.first?.text ?? "")")
+      // A hello, then a real pause for his answer before the recipe starts (his fourth PB&J: the question and the
+      // first step came in one breath, with no room to answer). His answer is a spoken turn; the mind chats back.
+      opening = true
+      say("Hey — how's your day going?")
+      startAfterHello(first: steps.first?.text ?? "")
       refresh()
       watchDevice()
       watch(session, mind)
       for await words in listener.utterances {
         lastHeard = words
+        if opening { heardHello = true }
         recorder?.note(.heard(words))
         heardAt = Date()
         let intent = parseIntent(words)
@@ -183,7 +211,7 @@ public final class CoachRunner {
         let outcome = await mind.tick {
           Mind.Now(step: session.stepIndex, finished: session.phase == .finished,
                    cookSpeaking: self.listener?.isHearing ?? false, coachSpeaking: self.speaker.isSpeaking,
-                   turnActive: self.turning)
+                   turnActive: self.turning || self.opening)
         }
         self.away = mind.held
         guard let outcome, !self.stopped else { continue }
