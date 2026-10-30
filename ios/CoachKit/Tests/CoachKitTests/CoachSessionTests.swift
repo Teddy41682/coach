@@ -292,6 +292,6 @@ import Testing
     let s = rig.session(steps: ["Only step."])
     await s.handle(.question("is that everything?"))
     #expect(s.phase == .finished)
-    #expect(rig.said == ["Yep, that's the whole sandwich — enjoy it."])
+    #expect(rig.said == ["Yep, that's the whole sandwich —", "enjoy it."])   // the opening clause goes out first
   }
 }

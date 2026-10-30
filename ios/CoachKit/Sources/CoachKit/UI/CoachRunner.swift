@@ -127,7 +127,8 @@ public final class CoachRunner {
           let jpegs: [Data]
           switch need {
           case .acrossStep(let since): jpegs = device.across(since: since, max: 6)
-          case .recent: jpegs = device.recent(2)
+          // One photo for a question, not two: each is ~1,000 tokens the model reads before its first word.
+          case .recent: jpegs = device.recent(1)
           }
           // Shown as the eye wakes are: ≤ 640 px (billed by pixels; the Worker refuses over 1024).
           return jpegs.compactMap { downscaleJPEG($0)?.base64EncodedString() }

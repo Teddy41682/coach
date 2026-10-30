@@ -41,6 +41,7 @@ export const cooking: ExpertisePack = {
       `This step uses: ${ctx.stepIngredients.join(", ") || "nothing specific"}`,
       ...(ctx.briefing.done ? [`Done when: ${ctx.briefing.done}`] : []),
       ...(ctx.briefing.mistakes ? [`Common mistakes: ${ctx.briefing.mistakes}`] : []),
+      ...(ctx.briefing.method ? [`Your method for this step — coach it this way and never contradict it: ${ctx.briefing.method}`] : []),
       ...(ctx.briefing.tip ? [`A tip you may offer once: ${ctx.briefing.tip}`] : []),
       ...(ctx.briefing.hardToSee ? ["This step's key action is hard to see in a photo: confirm it by asking, don't guess."] : []),
     ].join("\n");

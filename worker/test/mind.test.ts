@@ -130,3 +130,16 @@ describe("the mind's judgement, v8 (his sixth PB&J: tortillas passed as bread)",
     expect(s).toContain("Never call a step done because the cook says so");
   });
 });
+
+describe("the mind's judgement, v9 (his seventh PB&J: 'too quiet a lot of the time')", () => {
+  it("stays with the cook while their hands work, claims only the newest photo, and keeps to one method", async () => {
+    const { mindSystem } = await import("../src/expertise/mind-prompt");
+    const ctx = { sessionId: "s", stepIndex: 0, wake: "changed", timeline: [], quietFor: 0,
+      recipe: { title: "PB&J", ingredients: [], steps: ["Cut it in half."] }, stepIngredients: [],
+      briefing: { done: "", mistakes: "", tip: "", method: "One firm press straight down with a sharp knife.", hardToSee: false } } as never;
+    const s = mindSystem(ctx, false);
+    expect(s).toContain("coach at their shoulder");
+    expect(s).toContain("Only claim to see what is in the newest photo");
+    expect(s).toContain("never contradict it: One firm press straight down");
+  });
+});

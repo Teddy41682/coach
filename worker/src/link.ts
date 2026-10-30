@@ -5,21 +5,22 @@ const SYSTEM = [
   "You prepare a cooking coach to guide someone through a recipe, step by step.",
   "For each step: the ingredients that go in at that step (names exactly as given; an ingredient may be in more than one step, or none);",
   "what 'done' looks like for that step, as something you could judge by looking (done);",
-  "the common mistakes at that step (mistakes); and one short expert tip that isn't already in the recipe (tip).",
-  "Each of done, mistakes and tip is one short sentence, spoken-style.",
+  "the common mistakes at that step (mistakes); one short expert tip that isn't already in the recipe (tip);",
+  "and your method for that step: exactly how you, the chef, will coach it — the one technique you'll keep to all the way through (method), so your advice never contradicts itself.",
+  "Each of done, mistakes, tip and method is one short sentence, spoken-style.",
   "hardToSee: true if the step's key action can't be judged from a photo (a pinch of salt, a splash of vanilla), otherwise false.",
-  'Answer with JSON only, in this shape: {"steps": [{"ingredients": ["item"], "done": "…", "mistakes": "…", "tip": "…", "hardToSee": false}, …]} — one object per step, in step order.',
+  'Answer with JSON only, in this shape: {"steps": [{"ingredients": ["item"], "done": "…", "mistakes": "…", "tip": "…", "method": "…", "hardToSee": false}, …]} — one object per step, in step order.',
 ].join("\n");
 
 /** What the coach knows about one step before the cook starts: what goes in, and how to judge it. */
-export type StepPlan = { ingredients: string[]; done: string; mistakes: string; tip: string; hardToSee: boolean };
+export type StepPlan = { ingredients: string[]; done: string; mistakes: string; tip: string; method?: string; hardToSee: boolean };
 
 const FIELD_MAX = 300;
 const field = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, FIELD_MAX) : "");
 
 /** Every ingredient on every step, no briefing: what the coach falls back to when planning fails, so cooking still works. */
 function everything(recipe: CoachRecipe): StepPlan[] {
-  return recipe.steps.map(() => ({ ingredients: recipe.ingredients.map((i) => i.item), done: "", mistakes: "", tip: "", hardToSee: false }));
+  return recipe.steps.map(() => ({ ingredients: recipe.ingredients.map((i) => i.item), done: "", mistakes: "", tip: "", method: "", hardToSee: false }));
 }
 
 /**
@@ -51,7 +52,7 @@ export async function linkSteps(recipe: CoachRecipe, model: ModelConnector): Pro
       const items = Array.isArray(o.ingredients) ? o.ingredients : [];
       return {
         ingredients: items.filter((x): x is string => typeof x === "string" && known.has(x)),
-        done: field(o.done), mistakes: field(o.mistakes), tip: field(o.tip), hardToSee: o.hardToSee === true,
+        done: field(o.done), mistakes: field(o.mistakes), tip: field(o.tip), method: field(o.method), hardToSee: o.hardToSee === true,
       };
     });
   } catch (error) {

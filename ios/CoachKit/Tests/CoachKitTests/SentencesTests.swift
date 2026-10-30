@@ -19,6 +19,16 @@ import Testing
     var buf = "Use a spice, e.g. paprika, for colour. Next"
     #expect(completeSentences(&buf) == ["Use a spice, e.g. paprika, for colour."])
   }
+  @Test func anOpeningClauseGoesOutOnceFourWordsAreInFrontOfADash() {
+    var buf = "That landed on the plate — scrape"
+    #expect(openingClause(&buf) == "That landed on the plate —")
+    #expect(buf == "scrape")
+    var short = "Yeah, those are tortillas"
+    #expect(openingClause(&short) == nil)
+    var sentence = "Good. Now the edges, all round"
+    #expect(openingClause(&sentence) == nil)
+  }
+
   @Test func aDashDoesNotEndASentence() {
     var buf = "Not quite yet — the egg white"
     #expect(completeSentences(&buf).isEmpty)

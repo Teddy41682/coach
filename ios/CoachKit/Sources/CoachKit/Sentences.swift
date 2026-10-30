@@ -25,3 +25,18 @@ public func completeSentences(_ buffer: inout String) -> [String] {
   buffer = String(buffer[start...])
   return sentences.filter { !$0.isEmpty }
 }
+
+/// The answer's opening clause, taken off the front of `buffer` once a dash, comma or semicolon follows at least four
+/// words — so the coach starts speaking before the whole first sentence has streamed in ("That landed on the plate —"
+/// while "scrape it onto the slice" is still on its way). Nil until there is such a clause. Used for the first piece only.
+public func openingClause(_ buffer: inout String) -> String? {
+  for mark in [" — ", ", ", "; "] {
+    guard let r = buffer.range(of: mark) else { continue }
+    let head = buffer[..<r.lowerBound]
+    guard head.split(separator: " ").count >= 4, !head.contains(where: { ".!?".contains($0) }) else { continue }
+    let clause = (head.trimmingCharacters(in: .whitespaces)) + (mark == " — " ? " —" : mark.trimmingCharacters(in: .whitespaces))
+    buffer = String(buffer[r.upperBound...])
+    return clause
+  }
+  return nil
+}

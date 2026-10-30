@@ -269,7 +269,7 @@ def replay(folder, recipe, worker=None, spoken=True):
         st["step_start"] = t
         coach_say(t, step_line(steps, st["step"]))
 
-    def frames_at(t, n=2, since=None):
+    def frames_at(t, n=1, since=None):
         past = [p for (ft, p) in looks if ft <= t and (since is None or ft >= since)]
         if since is not None and len(past) > 6:
             past = [past[round(i * (len(past) - 1) / 5)] for i in range(6)]

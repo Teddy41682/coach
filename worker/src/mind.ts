@@ -27,7 +27,7 @@ export type MindRequest = {
 
 export type MindContext = Omit<MindRequest, "sessionId"> & {
   recipe: CoachRecipe;
-  briefing: { done: string; mistakes: string; tip: string; hardToSee?: boolean };
+  briefing: { done: string; mistakes: string; tip: string; method?: string; hardToSee?: boolean };
   stepIngredients?: string[];
 };
 

@@ -177,7 +177,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const ctx = {
       recipe: session.recipe, stepIndex: turn.stepIndex, utterance: turn.utterance, seen: turn.seen,
       stepIngredients: plan?.ingredients ?? [],
-      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "", hardToSee: plan?.hardToSee ?? false },
+      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "", method: plan?.method ?? "", hardToSee: plan?.hardToSee ?? false },
       hasPhotos: turn.frames.length > 0,
       history: turn.history ?? [],
     };
@@ -232,7 +232,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const plan = session.links[Math.min(m.stepIndex, Math.max(session.links.length - 1, 0))];
     const ctx: MindContext = {
       ...m, recipe: session.recipe, stepIngredients: plan?.ingredients ?? [],
-      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "", hardToSee: plan?.hardToSee ?? false },
+      briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "", method: plan?.method ?? "", hardToSee: plan?.hardToSee ?? false },
     };
     const day = hstDay(deps.now());
     if (m.wake === "spoke") {

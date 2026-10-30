@@ -161,6 +161,8 @@ public final class CoachSession {
         case .text(let piece):
           cancelAck()
           pending += piece
+          // The first words go out as soon as there's a clause to say: the voice starts ~a clause sooner.
+          if spoken.isEmpty, let lead = openingClause(&pending) { speak(lead) }
           completeSentences(&pending).forEach(speak)
         case .action(let d): decision = d
         case .error(let line): cancelAck(); flush(); say(line)
