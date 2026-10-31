@@ -93,9 +93,11 @@ describe("the final review: numbers the model adds, ingredients not in yet, cond
       new Set(["butter, softened", "sugar", "large eggs", "pure vanilla extract"]));
     expect(r.rescue?.adds.map((a) => a.item).sort()).toEqual(["butter", "large eggs", "sugar"]);
   });
-  it("a scale rescue is a redo when an ingredient's amount can't be read", () => {
+  it("a scale rescue is no rescue when an ingredient's amount can't be read (vanilla: taste first)", () => {
     const odd = { ...CUPCAKES, ingredients: CUPCAKES.ingredients.map((i) => i.item === "milk" ? { ...i, amount: "a splash" } : i) };
-    expect(rule("pure vanilla extract", { value: 1, unit: "tbsp" }, odd, "baking", FIXTURE).verdict).toBe("redo");
+    const r = rule("pure vanilla extract", { value: 1, unit: "tbsp" }, odd, "baking", FIXTURE);
+    expect(r.verdict).toBe("taste");
+    expect(r.reason).toMatch(/can't scale milk/);
   });
   it("a rescue for yeast dough is never offered for a recipe with no yeast", () => {
     const p = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "salt"

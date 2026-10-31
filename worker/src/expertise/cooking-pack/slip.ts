@@ -5,7 +5,7 @@ import { parseAmount, ratio, scaleAmount, speakAmount, type Amount } from "../am
 import { PACK } from "./index";
 import { mentionedItem, mentionedItems, normaliseItem, saidText, type Mention } from "./lookup";
 import type { Kind, Pack } from "./types";
-import { rule, type Ruling } from "./verdict";
+import { balance, rule, type Ruling } from "./verdict";
 
 /**
  * A slip, handled the way the spec decides (2026-10-31): the model never invents a rescue. Code spots the slip in the
@@ -27,6 +27,13 @@ export const SPOT_ON = "Spot on — carry on.";
 export const SEEN = (item: string) => `That looks like a lot of ${spoken(item)} — how much ${spoken(item)} went in?`;
 export const SAFE = (item: string) => `I can't be sure that'll come out right — let's redo that part with a fresh measure of ${spoken(item)}.`;
 const ASKED = /how much (.+) went in\?/i;
+/** Too much of a flavouring: taste before any ruling, the way a pro would (his ruling 2026-10-30). */
+export const TASTE = (item: string) => `That's more ${spoken(item)} than the recipe has — give it a small taste. Is the ${spoken(item)} too strong?`;
+const TASTED = /is the (.+) too strong\?$/i;
+/** The cook's verdict on the taste. A "no"/"good" reads as fine; anything else — "yes", "salty", "not great", "not
+ *  sure" — as too strong, since balancing a fine pot costs little and serving a strong one costs the dish. */
+const TASTES_FINE = /\b(no|nope|nah|not (too|really|that|very)|fine|good|great|perfect|delicious|tastes (right|ok|okay)|it'?s (ok|okay))\b/;
+const TASTES_BAD = /\bnot (good|great|nice|right)\b/;
 
 /** The newest thing the coach said, from the timeline ("0:41 coach: …"). */
 function lastCoachLine(timeline: string[]): string {
@@ -37,7 +44,9 @@ function lastCoachLine(timeline: string[]): string {
   return "";
 }
 
-export type Slip = { item: string; said: Amount | null };
+export type Slip = { item: string; said: Amount | null;
+  /** The answer to the coach's taste question: the said amount is the one from the cook's line before it. */
+  tasted?: "fine" | "strong" };
 
 /** A question about the recipe ("can I use honey instead?", "how much vanilla goes in?") is never a slip. */
 const QUESTION = /^(can|could|should|shall|do|does|did|is|are|was|will|would|what|how|when|which|why|any)\b|\?\s*$|\bhow (much|many)\b/;
@@ -47,7 +56,7 @@ const TOO_LITTLE = /\b(only|not enough|too little|short on|half the|half of the|
 function amountBeside(said: string, mentions: Mention[], k: number): Amount | null {
   const m = mentions[k];
   const from = k > 0 ? mentions[k - 1].at + mentions[k - 1].phrase.length : 0;
-  const before = parseAmount(said.slice(from, m.at).split(" ").slice(-6).join(" "));
+  const before = parseAmount(said.slice(from, m.at).trim().split(" ").slice(-6).join(" "));
   if (before) return before;
   const to = k + 1 < mentions.length ? mentions[k + 1].at : said.length;
   return parseAmount(said.slice(m.at + m.phrase.length, to).split(" ").slice(0, 6).join(" "));
@@ -60,6 +69,16 @@ function amountBeside(said: string, mentions: Mention[], k: number): Amount | nu
  * an ingredient alone, or two right amounts, is not a slip.
  */
 export function detectSlip(utterance: string, timeline: string[], recipe: CoachRecipe, pack: Pack = PACK): Slip | null {
+  const tasted = TASTED.exec(lastCoachLine(timeline));
+  if (tasted) {
+    const item = mentionedItem(tasted[1], recipe, pack)?.item;
+    const before = cookLineBeforeCoach(timeline);
+    const slip = item && before ? detectSlip(before.line, timeline.slice(0, before.at), recipe, pack) : null;
+    if (item && slip && slip.item === item) {
+      const lower = utterance.toLowerCase();
+      return { item, said: slip.said, tasted: !TASTES_BAD.test(lower) && TASTES_FINE.test(lower) ? "fine" : "strong" };
+    }
+  }
   const asked = ASKED.exec(lastCoachLine(timeline));
   if (asked) {
     const item = mentionedItem(asked[1], recipe, pack)?.item;
@@ -96,6 +115,7 @@ export function template(r: Ruling): string {
   const when = r.rescue?.when ? ` — ${r.rescue.when}` : "";
   if (r.verdict === "fine" && r.ratio !== null && Math.abs(r.ratio - 1) <= 0.05) return SPOT_ON;
   if (r.verdict === "fine") return `That's a little off on the ${item}, but well within range — carry on.`;
+  if (r.verdict === "taste") return TASTE(r.item);
   if (r.verdict === "redo" || r.verdict === "unknown") return SAFE(r.item);
   const rescue = r.rescue!;
   if (rescue.kind === "scale" && !rescue.adds.length) {
@@ -148,6 +168,17 @@ export type SlipContext = {
 
 const AFFIRM = /\b(yes|yep|yeah|yup|right|correct|exactly|what it said|the right amount|as (the )?recipe|all of it)\b/;
 
+/** The cook's line before the newest coach line, and where it sits in the timeline. */
+function cookLineBeforeCoach(timeline: string[]): { line: string; at: number } | null {
+  for (let i = timeline.length - 1, seenCoach = false; i >= 0; i--) {
+    const m = /^\d+:\d+ (cook|coach): (.*)$/.exec(timeline[i]);
+    if (!m) continue;
+    if (m[1] === "coach") seenCoach = true;
+    else if (seenCoach) return { line: m[2], at: i };
+  }
+  return null;
+}
+
 /** The cook's line before the newest coach line — what they said that led to the question. */
 function cookBeforeAsk(timeline: string[]): string {
   for (let i = timeline.length - 1, seenCoach = false; i >= 0; i--) {
@@ -174,9 +205,12 @@ export async function* slipEvents(slip: Slip, ctx: SlipContext): AsyncIterable<C
     yield* say(!signalled && (AFFIRM.test(latest) || !/(a lot|too much|not sure|no idea|don'?t know)/.test(latest)) ? CARRY_ON : SAFE(slip.item));
     return;
   }
-  const r = rule(slip.item, slip.said, ctx.recipe, ctx.kind, ctx.pack ?? PACK, ctx.addedSoFar);
+  if (slip.tasted === "fine") { yield* say(CARRY_ON); return; }
+  const r = (slip.tasted === "strong" ? balance : rule)(slip.item, slip.said, ctx.recipe, ctx.kind, ctx.pack ?? PACK, ctx.addedSoFar);
   yield { type: "verdict", verdict: r.verdict, item: r.item, ratio: r.ratio, by: r.rescue?.by };
   if (r.verdict === "unknown") { yield* say(SAFE(slip.item)); return; }
+  // The taste question is a fixed line, like the amount question: no model call.
+  if (r.verdict === "taste") { yield* say(TASTE(slip.item)); return; }
   const fixed = template(r);
   let line = "";
   try {

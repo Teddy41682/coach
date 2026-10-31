@@ -206,3 +206,14 @@ File layout and format of the pack; the exact role list; parsing of units; how t
 higher look rate during high-risk steps is set; the exam's file format and scoring script; the order of work
 against the Wednesday deadline (a pack-first vertical slice is suggested: a few roles end to end through the exam,
 then breadth).
+
+## Addendum 2026-10-30 — always taste (Mr. Graham's ruling)
+
+"Defer to what a pro chef would do — which would be always taste." Too much of a **flavouring** (salt, seasonings,
+spices, chili, acids, savoury sweeteners, extracts, garlic/onion/ginger — `FLAVOUR` in `verdict.ts`) is never a blind
+redo. Where the engine would have said redo (no sourced rescue, a provisional band, a batch too big), the verdict is
+`taste`: the coach says a fixed line, "That's more X than the recipe has — give it a small taste. Is the X too strong?"
+(no model call). The answer is caught in code: "fine/good/no" → "Okay — carry on."; anything else → `balance`: in
+savoury cooking, a bigger batch around it (capped at 2×, code's amounts), and in a bake (baking, pastry), start that
+part again. A sourced rescue still comes first; leaveners, structure and thickeners are never a taste. A rescue's
+spoken condition keeps only the cases that fit the dish.

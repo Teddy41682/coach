@@ -37,7 +37,10 @@ describe("verdicts in code", () => {
     expect(rule("pure vanilla extract", { value: 4, unit: "tsp" }, CUPCAKES, "baking", FIXTURE).verdict).toBe("fixable");
     const threeEggs = { ...CUPCAKES, ingredients: CUPCAKES.ingredients.map((i) => i.item === "large eggs" ? { ...i, amount: "3" } : i) };
     // 2.5× vanilla → make 1.25×: ¾ of an egg more — not a half, not whole.
-    expect(rule("pure vanilla extract", { value: 2.5, unit: "tsp" }, threeEggs, "baking", FIXTURE).verdict).toBe("redo");
+    // Vanilla is a flavouring, so that redo becomes a taste first (his ruling 2026-10-30); the reason is kept.
+    const egg = rule("pure vanilla extract", { value: 2.5, unit: "tsp" }, threeEggs, "baking", FIXTURE);
+    expect(egg.verdict).toBe("taste");
+    expect(egg.reason).toMatch(/part of an egg/);
   });
   it("unknown when the amount isn't a number, can't be compared, or the ingredient isn't in the pack", () => {
     expect(rule("pure vanilla extract", null, CUPCAKES, "baking", FIXTURE).verdict).toBe("unknown");
@@ -45,10 +48,10 @@ describe("verdicts in code", () => {
     const odd = { ...CUPCAKES, ingredients: [...CUPCAKES.ingredients, { amount: "1 tsp", item: "rose water" }] };
     expect(rule("rose water", { value: 3, unit: "tsp" }, odd, "baking", FIXTURE).verdict).toBe("unknown");
   });
-  it("a fixable band whose cut-point is provisional is a redo (doubt → redo)", () => {
+  it("a fixable band whose cut-point is provisional is no rescue — for a flavouring, a taste", () => {
     const shaky = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "flavour-extract"
       ? { ...r, bands: { default: r.bands.default.map((b) => (b.verdict === "fixable" ? { ...b, provisional: true } : b)) } } : r) };
-    expect(rule("pure vanilla extract", { value: 3, unit: "tsp" }, CUPCAKES, "baking", shaky).verdict).toBe("redo");
+    expect(rule("pure vanilla extract", { value: 3, unit: "tsp" }, CUPCAKES, "baking", shaky).verdict).toBe("taste");
     expect(rule("pure vanilla extract", { value: 1.5, unit: "tsp" }, CUPCAKES, "baking", shaky).verdict).toBe("fine");
   });
   it("chooses the role that has rules for this kind of cooking: butter in a sauté isn't cake butter", () => {
@@ -89,9 +92,9 @@ describe("verdicts in code", () => {
       expect(rule("salt", { value: 2, unit: "tsp" }, stew, "braise", p).rescue?.adds).toEqual([]);
     }
   });
-  it("a provisional rescue is never offered: redo", () => {
+  it("a provisional rescue is never offered — for a flavouring, a taste", () => {
     const shaky = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "flavour-extract"
       ? { ...r, rescues: r.rescues.map((x) => ({ ...x, provisional: true })) } : r) };
-    expect(rule("pure vanilla extract", { value: 3, unit: "tsp" }, CUPCAKES, "baking", shaky).verdict).toBe("redo");
+    expect(rule("pure vanilla extract", { value: 3, unit: "tsp" }, CUPCAKES, "baking", shaky).verdict).toBe("taste");
   });
 });

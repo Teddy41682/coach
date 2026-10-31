@@ -61,3 +61,10 @@ export const COOKIES = {
     { amount: "1 tsp", item: "salt" }, { amount: "1 cup", item: "butter" }, { amount: "2", item: "eggs" }],
   steps: ["Whisk the flour, baking soda and salt.", "Cream the butter, beat in the eggs, then fold in the flour."],
 };
+
+/** A soup for the taste tests: 1 tsp salt in 4 cups of stock, braised. */
+export const SOUP = {
+  title: "Chicken Noodle Soup",
+  ingredients: [{ amount: "4 cups", item: "chicken stock" }, { amount: "1 tsp", item: "salt" }, { amount: "1 cup", item: "milk" }],
+  steps: ["Bring the stock to a simmer and add the salt.", "Stir in the milk and simmer ten minutes."],
+};

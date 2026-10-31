@@ -6,7 +6,7 @@ Usage: python3 tools/exam.py [--private] [--label v13] [--only <substring>]
   public scenarios:  tools/exam/scenarios.json (recipes written for the exam)
   --private:         ~/coach-recordings/exam-private/scenarios.json (built from his own recipes; never in git)
 Each scenario: {"name", "recipe": {title, ingredients, steps}, "step": 1, "says": ["…", "…"],
-                "expect": {"verdict": "fixable"|"fine"|"redo"|"unknown"|"none"|"ask"|"*", "item": "…", "mentions": ["¾ cup"]}}
+                "expect": {"verdict": "fixable"|"fine"|"redo"|"taste"|"unknown"|"none"|"ask"|"*", "item": "…", "mentions": ["¾ cup"]}}
   verdict "*" (private scenarios): any ruling from code, or the coach asking how much — never an improvised answer.
   "says" are spoken in order; the coach's replies join the timeline between them, as on the phone.
   verdict "none": no verdict event (not a slip); "ask": the coach asked how much and ruled nothing.

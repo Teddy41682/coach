@@ -50,7 +50,7 @@
   }
  },
  {
-  "name": "vanilla 3x: pack is provisional → redo",
+  "name": "vanilla 3x → taste it first",
   "recipe": {
    "title": "Vanilla Cupcakes",
    "ingredients": [
@@ -97,7 +97,113 @@
    "about a tablespoon"
   ],
   "expect": {
+   "verdict": "taste",
+   "item": "pure vanilla extract"
+  }
+ },
+ {
+  "name": "vanilla 3x, tastes too strong → redo the bake",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "oh no, way too much vanilla",
+   "about a tablespoon",
+   "yeah it is way too strong"
+  ],
+  "expect": {
    "verdict": "redo",
+   "item": "pure vanilla extract"
+  }
+ },
+ {
+  "name": "vanilla 3x, tastes fine → carry on (no new ruling)",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "oh no, way too much vanilla",
+   "about a tablespoon",
+   "no, it tastes good actually"
+  ],
+  "expect": {
+   "verdict": "taste",
    "item": "pure vanilla extract"
   }
  },
@@ -200,7 +306,7 @@
    "like a glug"
   ],
   "expect": {
-   "verdict": "none",
+   "verdict": "unknown",
    "mentions": [
     "redo"
    ]
@@ -388,7 +494,7 @@
   }
  },
  {
-  "name": "salt 3× in rice → redo (the only rescue is provisional)",
+  "name": "salt 3× in rice → taste it first",
   "recipe": {
    "title": "Steamed Rice",
    "ingredients": [
@@ -416,7 +522,41 @@
    "I put a teaspoon and a half of salt in by mistake"
   ],
   "expect": {
-   "verdict": "redo",
+   "verdict": "taste",
+   "item": "salt"
+  }
+ },
+ {
+  "name": "salt 3× in rice, too salty → a bigger batch",
+  "recipe": {
+   "title": "Steamed Rice",
+   "ingredients": [
+    {
+     "amount": "1 cup",
+     "item": "long-grain rice"
+    },
+    {
+     "amount": "1 1/2 cups",
+     "item": "water"
+    },
+    {
+     "amount": "1/2 tsp",
+     "item": "salt"
+    }
+   ],
+   "steps": [
+    "Rinse the rice.",
+    "Add the rice, water and salt to a pot and bring to a boil.",
+    "Cover and simmer for 18 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I put a teaspoon and a half of salt in by mistake",
+   "yes, way too salty"
+  ],
+  "expect": {
+   "verdict": "fixable",
    "item": "salt"
   }
  },
@@ -523,7 +663,7 @@
   }
  },
  {
-  "name": "lemon 2× in a vinaigrette → redo (dressing bands provisional at 2×)",
+  "name": "lemon 2× in a vinaigrette → whisk in more oil",
   "recipe": {
    "title": "Lemon Vinaigrette",
    "ingredients": [
@@ -550,7 +690,7 @@
    "I added half a cup of lemon juice by mistake"
   ],
   "expect": {
-   "verdict": "redo",
+   "verdict": "fixable",
    "item": "lemon juice"
   }
  },
@@ -821,7 +961,7 @@
   }
  },
  {
-  "name": "rose water is a potent flavouring, not water → redo",
+  "name": "rose water is a potent flavouring, not water → taste",
   "recipe": {
    "title": "Vanilla Cupcakes",
    "ingredients": [
@@ -871,7 +1011,7 @@
    "I put a tablespoon of rose water in by mistake"
   ],
   "expect": {
-   "verdict": "redo",
+   "verdict": "taste",
    "item": "rose water"
   }
  },
