@@ -31,6 +31,9 @@ export function validatePack(p: Pack): string[] {
     r.substitutions.forEach((s, i) => sourced(`role ${r.id} substitution ${i} (${s.use})`, s.sources, s.provisional));
     r.changes.forEach((c, i) => sourced(`role ${r.id} change ${i} (${c.direction})`, c.sources, c.provisional));
   }
+  for (const [alias, name] of Object.entries(p.aliases)) {
+    if (!p.index[name]) errors.push(`alias ${alias}: ${name} is not in the index`);
+  }
   for (const [item, roles] of Object.entries(p.index)) {
     for (const id of roles) if (!ids.has(id)) errors.push(`index ${item}: unknown role ${id}`);
   }

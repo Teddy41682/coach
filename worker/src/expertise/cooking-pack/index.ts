@@ -9,4 +9,7 @@ const ROLES: Role[] = [];
 /** Each role's items and aliases, normalised (lookup.ts `normaliseItem`), → the roles they fill. */
 const INDEX: Record<string, string[]> = {};
 
-export const PACK: Pack = { version: "2026-10-31", roles: ROLES, index: INDEX };
+/** Other names for the same ingredient → its indexed name. */
+const ALIASES: Record<string, string> = {};
+
+export const PACK: Pack = { version: "2026-10-31", roles: ROLES, index: INDEX, aliases: ALIASES };

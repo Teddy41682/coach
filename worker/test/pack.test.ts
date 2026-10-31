@@ -10,7 +10,7 @@ const role = (over: Partial<Role> = {}): Role => ({
   rescues: [{ id: "scale", kind: "scale", say: "make a bigger batch", sources: S }],
   substitutions: [], changes: [], shows: "dark streaks", sources: S, ...over,
 });
-const pack = (r: Role, index: Pack["index"] = { vanilla: ["flavour-extract"] }): Pack => ({ version: "t", roles: [r], index });
+const pack = (r: Role, index: Pack["index"] = { vanilla: ["flavour-extract"] }): Pack => ({ version: "t", roles: [r], index, aliases: {} });
 
 describe("the pack's checker", () => {
   it("passes a sound pack", () => {

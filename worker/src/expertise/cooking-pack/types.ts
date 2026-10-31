@@ -55,4 +55,7 @@ export type Pack = {
   roles: Role[];
   /** Normalised ingredient name or alias → role ids. */
   index: Record<string, string[]>;
+  /** Another name for the very same ingredient → its indexed name ("bicarbonate of soda" → "baking soda"). Never a
+   *  different ingredient that does the same job: almond extract is not vanilla. */
+  aliases: Record<string, string>;
 };
