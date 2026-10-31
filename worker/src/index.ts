@@ -2,7 +2,7 @@ import { cooking } from "./expertise/cooking";
 import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
 import { buildBrief, kindOf } from "./expertise/cooking-pack/brief";
-import { SEEN, detectSlip, scaleRecipe, slipEvents } from "./expertise/cooking-pack/slip";
+import { SAFE, SEEN, detectSlip, scaleRecipe, slipEvents } from "./expertise/cooking-pack/slip";
 import { mentionedItem } from "./expertise/cooking-pack/lookup";
 import { answerChange, changeEvents, detectChange } from "./expertise/cooking-pack/change";
 import type { Pack } from "./expertise/cooking-pack/types";
@@ -16,7 +16,7 @@ import { mindSystem, mindUser } from "./expertise/mind-prompt";
 import { jpegSize } from "./jpeg";
 import type { Completer } from "./model/connector";
 import { D1SessionStore, type SessionStore } from "./session";
-import { encodeEvent } from "./sse";
+import { encodeEvent, type CoachEvent } from "./sse";
 import { runTurn, type TurnRequest } from "./turn";
 import { verifyToken } from "./token";
 import { LISTEN_RESERVE_MILLICENTS, listenMillicents, MUSE_ASR_URL, relay, type Sock } from "./listen";
@@ -256,17 +256,16 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
           const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
           return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
         }
-        const events = slipEvents(slip, { recipe, kind: kindOf(session.recipe), timeline: m.timeline, model: deps.model("mind"), pack: deps.pack });
+        const addedSoFar = new Set(session.links.slice(0, m.stepIndex + 1).flatMap((l) => l.ingredients));
+        const events = slipEvents(slip, { recipe, kind: kindOf(session.recipe), timeline: m.timeline, model: deps.model("mind"),
+          pack: deps.pack, addedSoFar, utterance: m.utterance });
         const store = deps.store, scale = session.scale ?? 1;
-        return new Response(new ReadableStream({
-          async start(controller) {
-            for await (const e of events) {
-              if (e.type === "verdict" && e.verdict === "fixable" && e.by) await store.setScale(m.sessionId, scale * e.by);
-              controller.enqueue(encodeEvent(e));
-            }
-            controller.close();
-          },
-        }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+        return eventStream(events, async (e) => {
+          // The bigger batch is remembered for later steps; if the store fails, the cook still hears the rescue.
+          if (e.type === "verdict" && e.verdict === "fixable" && e.by) {
+            try { await store.setScale(m.sessionId, scale * e.by); } catch (err) { console.warn("setScale failed:", String(err)); }
+          }
+        }, SAFE(slip.item));
       }
       // A substitution or change the pack can answer is answered from it; one it can't goes to the mind as judgement.
       const change = detectChange(m.utterance ?? "", recipe, deps.pack);
@@ -276,10 +275,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
           const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
           return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
         }
-        const events = changeEvents(grounded, deps.model("mind"));
-        return new Response(new ReadableStream({
-          async start(controller) { for await (const e of events) controller.enqueue(encodeEvent(e)); controller.close(); },
-        }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+        return eventStream(changeEvents(grounded, deps.model("mind")), async () => {}, grounded.facts);
       }
       const judgement = change ? "\nThis substitution or change is not in your knowledge pack: give your own judgement and say it is your judgement, or say you'd keep it as written." : "";
       // The cook's words: answered as a turn — streamed, charged like a turn — under the same judgement.
@@ -301,7 +297,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     await settleObserve(deps.usage, day, realMillicents(answer.usage));
     // The eyes think too much of something went in: a fixed question, never a guessed number (expertise spec).
     const seen = answer.slip && mentionedItem(answer.slip.item, recipe, deps.pack);
-    if (seen) return Response.json({ ...answer, say: SEEN(seen.item), kind: "mistake" });
+    if (seen) return Response.json({ ...answer, say: SEEN(seen.item), kind: "mistake", step: "stay" });
     return Response.json(answer);
   }
 
@@ -338,6 +334,37 @@ async function openMuse(): Promise<Sock | null> {
   if (!ws) return null;
   ws.accept();
   return ws as unknown as Sock;
+}
+
+/**
+ * A turn's events as server-sent events. Whatever goes wrong mid-stream, the cook hears `fallback` and the stream
+ * ends with done — never silence (the final review: a failing store left the cook with nothing). A client that
+ * disconnects stops the work.
+ */
+function eventStream(events: AsyncIterable<CoachEvent>, each: (e: CoachEvent) => Promise<void>, fallback: string): Response {
+  let gone = false;
+  return new Response(new ReadableStream({
+    async start(controller) {
+      let ended = false;
+      try {
+        for await (const e of events) {
+          if (gone) return;
+          await each(e);
+          controller.enqueue(encodeEvent(e));
+          if (e.type === "done") ended = true;
+        }
+      } catch (err) {
+        console.warn("turn stream failed:", String(err));
+      }
+      if (!ended && !gone) {
+        controller.enqueue(encodeEvent({ type: "text", text: fallback }));
+        controller.enqueue(encodeEvent({ type: "action", action: "stay" }));
+        controller.enqueue(encodeEvent({ type: "done" }));
+      }
+      if (!gone) controller.close();
+    },
+    cancel() { gone = true; },
+  }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
 }
 
 export default {

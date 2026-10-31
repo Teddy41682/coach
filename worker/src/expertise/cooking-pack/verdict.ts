@@ -30,7 +30,11 @@ const unknown = (item: string, reason: string, r: number | null = null): Ruling 
  * or says to redo — whenever the amount isn't a number, can't be compared, or the ingredient isn't in the pack. A
  * provisional rescue, a batch over MAX_SCALE, or a part of an egg other than a half is a redo.
  */
-export function rule(item: string, said: Amount | null, recipe: CoachRecipe, kind: Kind, pack: Pack = PACK): Ruling {
+export function rule(
+  item: string, said: Amount | null, recipe: CoachRecipe, kind: Kind, pack: Pack = PACK,
+  /** The recipe lines already in (steps up to now): a bigger batch adds only these; later steps arrive scaled. */
+  addedSoFar?: Set<string>,
+): Ruling {
   const roles = rolesFor(item, pack);
   // The role with rules for this kind of cooking first (butter in a sauté is cooking fat, not cake butter), then the
   // tightest of them.
@@ -50,14 +54,23 @@ export function rule(item: string, said: Amount | null, recipe: CoachRecipe, kin
   if (band.provisional) return { ...base, verdict: "redo", reason: "the fixable range isn't sourced well enough to offer a rescue" };
   const rescue = role.rescues.find((x) => x.id === band.rescue);
   if (!rescue || rescue.provisional) return { ...base, verdict: "redo", reason: "no sourced rescue" };
+  // A rescue for yeast dough is no rescue for a recipe with no yeast (its `when` is a condition, not just words).
+  const hasYeast = recipe.ingredients.some((i) => /yeast/i.test(i.item) || rolesFor(i.item, pack).some((q) => q.id === "yeast"));
+  if (/\b(yeast|rise|proof)/i.test(rescue.when ?? "") && !hasYeast) {
+    return { ...base, verdict: "redo", reason: "the rescue is for yeast dough; this recipe has none" };
+  }
   const said_ = { say: rescue.say, when: rescue.when };
 
   if (rescue.kind === "scale") {
     const by = Math.ceil((r / fineCeiling(bands)) * 4) / 4;
     if (by > MAX_SCALE) return { ...base, verdict: "redo", reason: "would need a bigger batch than one pan" };
-    const adds = recipe.ingredients.filter((i) => i !== line)
+    const inSoFar = recipe.ingredients.filter((i) => i !== line && (!addedSoFar || addedSoFar.has(i.item)));
+    // An amount that can't be read can't be scaled: the batch would come out of proportion — a redo.
+    const unreadable = inSoFar.find((i) => i.amount.trim() && !parseAmount(i.amount) && !/taste|needed|serv|optional|garnish/i.test(`${i.amount} ${i.item}`));
+    if (unreadable) return { ...base, verdict: "redo", reason: `can't scale ${unreadable.item} (${unreadable.amount})` };
+    const adds = inSoFar
       .map((i) => ({ item: i.item.split(",")[0].trim(), amount: parseAmount(i.amount), roles: rolesFor(i.item, pack) }))
-      .filter((x): x is { item: string; amount: Amount; roles: Role[] } => !!x.amount)
+      .filter((x): x is { item: string; amount: Amount; roles: Role[] } => !!x.amount && x.amount.value > 0)
       .map((x) => ({ item: x.item, amount: scaleAmount(x.amount, by - 1), egg: x.roles.some((q) => q.id === "egg" || q.id.startsWith("egg-")) }));
     if (adds.some((a) => a.egg && !Number.isInteger(a.amount.value * 2))) {
       return { ...base, verdict: "redo", reason: "would need part of an egg" };

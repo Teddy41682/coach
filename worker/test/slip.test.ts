@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ASK, SAFE, detectSlip, keptNumbers, scaleRecipe, slipEvents, template, type VerdictEvent } from "../src/expertise/cooking-pack/slip";
+import { ASK, CARRY_ON, SAFE, SPOT_ON, detectSlip, keptNumbers, scaleRecipe, slipEvents, template, type VerdictEvent } from "../src/expertise/cooking-pack/slip";
 import { rule } from "../src/expertise/cooking-pack/verdict";
 import type { ModelConnector } from "../src/model/connector";
 import type { CoachEvent } from "../src/sse";
@@ -47,7 +47,7 @@ describe("not mistaking questions and plain statements for slips (the final revi
 
 describe("handling it", () => {
   const ctx = (said: string[], model: ModelConnector, timeline: string[] = []) =>
-    collect(slipEvents(detectSlip(said.at(-1)!, timeline, CUPCAKES, FIXTURE)!, { recipe: CUPCAKES, kind: "baking", timeline, model, pack: FIXTURE }));
+    collect(slipEvents(detectSlip(said.at(-1)!, timeline, CUPCAKES, FIXTURE)!, { recipe: CUPCAKES, kind: "baking", timeline, model, pack: FIXTURE, utterance: said.at(-1) }));
 
   it("no amount yet: asks how much — a fixed line, no model call", async () => {
     const calls = { n: 0 };
@@ -76,6 +76,38 @@ describe("handling it", () => {
       { recipe: COOKIES, kind: "baking", timeline: [], model: saying("That much soda will taste soapy — let's start that dough again."), pack: FIXTURE }));
     expect(es[0]).toMatchObject({ type: "verdict", verdict: "redo" });
     expect(texts(es)).toContain("start");
+  });
+});
+
+describe("the final review: numbers the model adds, ingredients not in yet, conditions, the confirm answer", () => {
+  it("a line with any number code didn't compute is replaced by the fixed one", () => {
+    const r = rule("pure vanilla extract", { value: 1, unit: "tbsp" }, CUPCAKES, "baking", FIXTURE);
+    expect(keptNumbers(template(r), r)).toBe(true);
+    expect(keptNumbers(template(r) + " Then double the oven time to 40 minutes.", r)).toBe(false);
+    const fine = rule("pure vanilla extract", { value: 1.25, unit: "tsp" }, CUPCAKES, "baking", FIXTURE);
+    expect(keptNumbers("That's fine — just add 2 more tablespoons of milk.", fine)).toBe(false);
+  });
+  it("a bigger batch adds only what has already gone in — later steps simply arrive scaled", () => {
+    // Vanilla goes in at step 2 (index 1); flour, baking powder and milk come later.
+    const r = rule("pure vanilla extract", { value: 1, unit: "tbsp" }, CUPCAKES, "baking", FIXTURE,
+      new Set(["butter, softened", "sugar", "large eggs", "pure vanilla extract"]));
+    expect(r.rescue?.adds.map((a) => a.item).sort()).toEqual(["butter", "large eggs", "sugar"]);
+  });
+  it("a scale rescue is a redo when an ingredient's amount can't be read", () => {
+    const odd = { ...CUPCAKES, ingredients: CUPCAKES.ingredients.map((i) => i.item === "milk" ? { ...i, amount: "a splash" } : i) };
+    expect(rule("pure vanilla extract", { value: 1, unit: "tbsp" }, odd, "baking", FIXTURE).verdict).toBe("redo");
+  });
+  it("a rescue for yeast dough is never offered for a recipe with no yeast", () => {
+    const p = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "salt"
+      ? { ...r, rescues: r.rescues.map((x) => x.id === "add-missing" ? { ...x, when: "yeast dough, before the bulk rise" } : x) } : r) };
+    expect(rule("salt", { value: 0.25, unit: "tsp" }, COOKIES, "baking", p).verdict).toBe("redo");
+  });
+  it("the cook's 'yes' to the phone's own confirm question carries on; the recipe amount is 'spot on'", async () => {
+    const tl = [`0:41 coach: How much pure vanilla extract went in?`];
+    const es = await collect(slipEvents(detectSlip("yep", tl, CUPCAKES, FIXTURE)!, { recipe: CUPCAKES, kind: "baking", timeline: tl, model: saying("x"), pack: FIXTURE, utterance: "yep" }));
+    expect(texts(es)).toBe(CARRY_ON);
+    const right = rule("pure vanilla extract", { value: 1, unit: "tsp" }, CUPCAKES, "baking", FIXTURE);
+    expect(template(right)).toBe(SPOT_ON);
   });
 });
 

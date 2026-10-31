@@ -103,7 +103,9 @@ describe("POST /v1/mind — a slip in the cook's words is ruled on in code", asy
   const { ASK } = await import("../src/expertise/cooking-pack/slip");
   async function cupcakeDeps(phrase: string) {
     const store = new MemorySessionStore();
-    await store.put({ id: "s1", device: "d1", recipe: CUPCAKES, links: CUPCAKES.steps.map(() => plan), createdAt: 0 });
+    // As linkSteps gives them: each step's ingredients by the recipe's own names.
+    const uses = [["butter, softened", "sugar"], ["large eggs", "pure vanilla extract"], ["all-purpose flour", "baking powder"], ["milk"], []];
+    await store.put({ id: "s1", device: "d1", recipe: CUPCAKES, links: uses.map((ingredients) => ({ ...plan, ingredients })), createdAt: 0 });
     const calls = { stream: 0 };
     const model = { async *stream() { calls.stream++; yield phrase; }, async complete() { return { text: "{}", usage: { input: 0, cachedInput: 0, output: 0 } }; } };
     return { store, usage: new MemoryUsageStore(), model: () => model, now: () => Date.parse("2026-10-27T20:00:00Z"), pack: FIXTURE, calls };
@@ -118,11 +120,20 @@ describe("POST /v1/mind — a slip in the cook's words is ruled on in code", asy
     expect(d.calls.stream).toBe(0);
   });
   it("rules on the answer, says it with code's numbers, and remembers the bigger batch", async () => {
-    const d = await cupcakeDeps("Easy fix — make it 1.5× bigger: add ¾ cup all-purpose flour, ½ cup sugar, 1 large eggs, ¼ cup butter and ¼ cup milk.");
+    const d = await cupcakeDeps("Easy fix — make it 1.5× bigger: add ½ cup sugar, 1 large eggs and ¼ cup butter.");
     const es = await events(await worker.handle(post(spoke("about a tablespoon", [`0:41 coach: ${ASK("pure vanilla extract")}`])), env, d));
     expect(es[0]).toMatchObject({ type: "verdict", verdict: "fixable", by: 1.5 });
-    expect(es.find((e) => e.type === "text").text).toContain("¾ cup all-purpose flour");
+    // Only what's in so far (steps 1–2); flour, powder and milk come later, scaled.
+    expect(es.find((e) => e.type === "text").text).toContain("½ cup sugar");
+    expect(es.find((e) => e.type === "text").text).not.toContain("flour");
     expect((await d.store.get("s1"))?.scale).toBe(1.5);
+  });
+  it("a store that fails mid-rescue still ends with words and done — never silence (the final review)", async () => {
+    const d = await cupcakeDeps("Easy fix — add ¾ cup all-purpose flour, ½ cup sugar, 1 large eggs, ¼ cup butter.");
+    d.store.setScale = async () => { throw new Error("D1 down"); };
+    const es = await events(await worker.handle(post(spoke("about a tablespoon", [`0:41 coach: ${ASK("pure vanilla extract")}`])), env, d));
+    expect(es.some((e) => e.type === "text")).toBe(true);
+    expect(es.at(-1)).toEqual({ type: "done" });
   });
   it("words that aren't a slip still go to the mind as before", async () => {
     const d = await cupcakeDeps("Looking smooth.");
@@ -138,11 +149,12 @@ describe("POST /v1/mind — the eyes flag a slip; the route asks, with no number
     const store = new MemorySessionStore();
     await store.put({ id: "s1", device: "d1", recipe: CUPCAKES, links: CUPCAKES.steps.map(() => plan), createdAt: 0 });
     const model = { async *stream() { yield ""; }, async complete() {
-      return { text: '{"seen":["poured vanilla from the bottle"],"say":"Whoa, about three teaspoons!","kind":"mistake","step":"stay","slip":{"item":"vanilla extract"}}', usage: { input: 1, cachedInput: 0, output: 1 } }; } };
+      return { text: '{"seen":["poured vanilla from the bottle"],"say":"Whoa, about three teaspoons!","kind":"mistake","step":"next","slip":{"item":"vanilla extract"}}', usage: { input: 1, cachedInput: 0, output: 1 } }; } };
     const d = { store, usage: new MemoryUsageStore(), model: () => model, now: () => Date.parse("2026-10-27T20:00:00Z"), pack: FIXTURE };
     const r = await worker.handle(post({ ...body, stepIndex: 1 }), env, d);
     const a = await r.json() as { say: string; kind: string };
     expect(a.say).toBe("That looks like a lot of vanilla extract — how much vanilla extract went in?");
     expect(a.kind).toBe("mistake");
+    expect((a as { step?: string }).step).toBe("stay");
   });
 });

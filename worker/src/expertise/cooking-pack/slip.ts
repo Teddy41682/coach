@@ -20,6 +20,9 @@ const FORGOT = /\b(forgot|forgotten|left out|didn't put|didn't add|never added)\
 const spoken = (item: string) => normaliseItem(item) || item;
 
 export const ASK = (item: string) => `How much ${spoken(item)} went in?`;
+/** The answer to the phone's own confirm question with no number and nothing wrong said: carry on. */
+export const CARRY_ON = "Okay — carry on.";
+export const SPOT_ON = "Spot on — carry on.";
 /** What the coach says when the eyes think too much went in: still a question, never a number. */
 export const SEEN = (item: string) => `That looks like a lot of ${spoken(item)} — how much ${spoken(item)} went in?`;
 export const SAFE = (item: string) => `I can't be sure that'll come out right — let's redo that part with a fresh measure of ${spoken(item)}.`;
@@ -91,16 +94,29 @@ const list = (r: Ruling) => (r.rescue?.adds ?? []).map((a) => `${speakAmount(a.a
 export function template(r: Ruling): string {
   const item = spoken(r.item);
   const when = r.rescue?.when ? ` — ${r.rescue.when}` : "";
+  if (r.verdict === "fine" && r.ratio !== null && Math.abs(r.ratio - 1) <= 0.05) return SPOT_ON;
   if (r.verdict === "fine") return `That's a little off on the ${item}, but well within range — carry on.`;
   if (r.verdict === "redo" || r.verdict === "unknown") return SAFE(r.item);
   const rescue = r.rescue!;
-  if (rescue.kind === "scale") return `We can save it — make the batch ${rescue.by}× bigger: add ${list(r)}${when}.`;
+  if (rescue.kind === "scale" && !rescue.adds.length) {
+    return `We can save it — we'll make the batch ${rescue.by}× bigger, and I'll give you every amount from here scaled up${when}.`;
+  }
+  if (rescue.kind === "scale") return `We can save it — make the batch ${rescue.by}× bigger: add ${list(r)} now, and I'll give you every amount from here scaled up${when}.`;
   if (rescue.kind === "add" && rescue.adds.length) return `We can fix that — add ${list(r)}${when}.`;
   return `${rescue.say}${when}.`;
 }
 
-/** Every quantity code computed is in the line, exactly as `speakAmount` says it. */
+const NUMBER = /\d+(?:[./]\d+)?|[¼½¾⅓⅔⅛⅜⅝⅞]|\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|half|quarter|third|double|twice|triple|dozen)\b/gi;
+const numbersIn = (s: string) => new Set((s.match(NUMBER) ?? []).map((n) => n.toLowerCase()));
+
+/**
+ * The model's line may be said only if every quantity code computed is in it, exactly as `speakAmount` says it, and
+ * it has no number of its own — not "double the oven time", not "2 more tablespoons" on a fine verdict (the final
+ * review: a fine verdict passed any number before).
+ */
 export function keptNumbers(line: string, r: Ruling): boolean {
+  const allowed = numbersIn(template(r));
+  if ([...numbersIn(line)].some((n) => !allowed.has(n))) return false;
   return (r.rescue?.adds ?? []).every((a) => line.includes(speakAmount(a.amount)));
 }
 
@@ -122,18 +138,43 @@ const PHRASE = [
   "Keep every quantity exactly as written. Add no other advice, no new ingredients, no new numbers.",
 ].join("\n");
 
-export type SlipContext = { recipe: CoachRecipe; kind: Kind; timeline: string[]; model: ModelConnector; pack?: Pack };
+export type SlipContext = {
+  recipe: CoachRecipe; kind: Kind; timeline: string[]; model: ModelConnector; pack?: Pack;
+  /** Recipe lines already in (steps up to now): a bigger batch adds only these. */
+  addedSoFar?: Set<string>;
+  /** The cook's words this turn. */
+  utterance?: string;
+};
+
+const AFFIRM = /\b(yes|yep|yeah|yup|right|correct|exactly|what it said|the right amount|as (the )?recipe|all of it)\b/;
+
+/** The cook's line before the newest coach line — what they said that led to the question. */
+function cookBeforeAsk(timeline: string[]): string {
+  for (let i = timeline.length - 1, seenCoach = false; i >= 0; i--) {
+    const m = /^\d+:\d+ (cook|coach): (.*)$/.exec(timeline[i]);
+    if (!m) continue;
+    if (m[1] === "coach") seenCoach = true;
+    else if (seenCoach) return m[2].toLowerCase();
+  }
+  return "";
+}
 export type VerdictEvent = Extract<CoachEvent, { type: "verdict" }>;
 
 /** The events one slip turn streams: maybe a verdict, the line to say, then stay and done. */
 export async function* slipEvents(slip: Slip, ctx: SlipContext): AsyncIterable<CoachEvent | VerdictEvent> {
   const say = (text: string): (CoachEvent | VerdictEvent)[] => [{ type: "text", text }, { type: "action", action: "stay" }, { type: "done" }];
   if (!slip.said) {
-    const alreadyAsked = lastCoachLine(ctx.timeline) === ASK(slip.item);
-    yield* say(alreadyAsked ? SAFE(slip.item) : ASK(slip.item));
+    const last = lastCoachLine(ctx.timeline);
+    if (!ASKED.test(last)) { yield* say(ASK(slip.item)); return; }
+    // Asked already and no number. If nothing wrong was ever said — the phone's own confirm question — a "yep" means
+    // carry on; after a slip ("way too much", "that looks like a lot"), the safe answer.
+    const signalled = /^that looks like a lot/i.test(last) || SLIP_WORDS.test(cookBeforeAsk(ctx.timeline))
+      || TOO_LITTLE.test(cookBeforeAsk(ctx.timeline));
+    const latest = (ctx.utterance ?? /^\d+:\d+ cook: (.*)$/.exec(ctx.timeline[ctx.timeline.length - 1] ?? "")?.[1] ?? "").toLowerCase();
+    yield* say(!signalled && (AFFIRM.test(latest) || !/(a lot|too much|not sure|no idea|don'?t know)/.test(latest)) ? CARRY_ON : SAFE(slip.item));
     return;
   }
-  const r = rule(slip.item, slip.said, ctx.recipe, ctx.kind, ctx.pack ?? PACK);
+  const r = rule(slip.item, slip.said, ctx.recipe, ctx.kind, ctx.pack ?? PACK, ctx.addedSoFar);
   yield { type: "verdict", verdict: r.verdict, item: r.item, ratio: r.ratio, by: r.rescue?.by };
   if (r.verdict === "unknown") { yield* say(SAFE(slip.item)); return; }
   const fixed = template(r);

@@ -6,3 +6,4 @@ node_modules/
 tools/.replay-sessions.json
 tools/__pycache__/
 .superpowers/
+worker/node_modules
