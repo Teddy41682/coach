@@ -286,6 +286,14 @@ import Testing
     #expect(rig.said.filter { $0 == "That was the last step. Enjoy it." }.count == 1)
   }
 
+  /// Katie's PB&J: answers ended by reading the step back.
+  @Test func anAnswerDoesNotTailOffIntoTheStepReadBack() async {
+    let rig = Rig(); rig.reply = [.text("Fair enough, we'll use it as is. Now whisk the flour right through."), .action(.stay), .done]
+    let s = rig.session()
+    await s.handle(.question("is the plate okay?"))
+    #expect(rig.said == ["Fair enough, we'll use it as is."])
+  }
+
   /// His third PB&J: "Yep, that's the whole sandwich — enjoy it." then "That was the last step. Enjoy it."
   @Test func whenTheCoachHasSaidItsPieceTheEndAddsNothing() async {
     let rig = Rig(); rig.reply = [.text("Yep, that's the whole sandwich — enjoy it."), .action(.next), .done]

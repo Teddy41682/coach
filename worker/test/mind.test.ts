@@ -17,7 +17,7 @@ function model(text: string, seen: ModelRequest[] = []): Completer {
 describe("wakeMind", () => {
   it("returns what the mind saw, said and decided, with its usage", async () => {
     const a = await wakeMind(ctx(), model('{"seen":["put two slices in the toaster"],"say":null,"step":"stay"}'));
-    expect(a).toEqual({ seen: ["put two slices in the toaster"], say: null, step: "stay", usage: used });
+    expect(a).toEqual({ seen: ["put two slices in the toaster"], say: null, step: "stay", kind: "cue", usage: used });
   });
   it("says a line and moves on when it judges so", async () => {
     const a = await wakeMind(ctx(), model('Sure: {"seen":[],"say":"Bread\'s in — now the eggs.","step":"next"}'));
@@ -168,5 +168,17 @@ describe("the mind's judgement, v11 (Katie's PB&J: 59 lines in four minutes)", (
     expect(spoken).toContain("reply with only the [[stay]] line");
     expect(spoken).toContain("never read it back or reword it");
     expect(spoken).toContain("Don't invent requirements the recipe doesn't have");
+  });
+});
+
+describe("the line's kind (his ruling 2026-10-31: decisions in code)", () => {
+  it("passes the mind's label through, and anything else is a cue", async () => {
+    const used = { input: 1, cachedInput: 0, output: 1 };
+    const ctx = { sessionId: "s", stepIndex: 0, wake: "changed", timeline: [], quietFor: 0,
+      recipe: { title: "PB&J", ingredients: [], steps: ["Spread it."] }, stepIngredients: [],
+      briefing: { done: "", mistakes: "", tip: "", hardToSee: false } } as never;
+    const answering = (text: string) => ({ complete: async () => ({ text, usage: used }) }) as never;
+    expect((await wakeMind(ctx, answering('{"seen":[],"say":"On the plate!","kind":"mistake","step":"stay"}'))).kind).toBe("mistake");
+    expect((await wakeMind(ctx, answering('{"seen":[],"say":"Hm.","kind":"shout","step":"stay"}'))).kind).toBe("cue");
   });
 });

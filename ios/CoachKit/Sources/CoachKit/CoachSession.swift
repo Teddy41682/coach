@@ -134,7 +134,13 @@ public final class CoachSession {
     var decision = Decision.stay
     // Text arrives in fragments; it is spoken a whole sentence at a time, and whatever is left when the turn ends.
     var pending = ""
-    func speak(_ line: String) { spoken.append(line); say(line) }
+    let stepText = steps.indices.contains(stepIndex) ? steps[stepIndex].text : ""
+    func speak(_ line: String) {
+      // An answer that tails off into the step read back ("…right, spread it on one slice, right to the edges") stops
+      // where the answer did: the step is said by the phone, once (Katie's PB&J).
+      if !spoken.isEmpty, overlap(line, stepText) >= 0.6 { return }
+      spoken.append(line); say(line)
+    }
     func flush() {
       let rest = pending.trimmingCharacters(in: .whitespacesAndNewlines)
       if !rest.isEmpty { speak(rest) }

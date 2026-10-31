@@ -14,10 +14,12 @@ public final class Mind {
     public var coachSpeaking: Bool
     /// A spoken turn is in flight (from the cook's words to the end of the answer): the one call in flight.
     public var turnActive: Bool
+    /// The current step's words, so a cue that only reads it back is never said.
+    public var stepText: String
     /// On the recipe's last step: the eyes may say it looks done, but finishing the recipe takes the cook's word.
-    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool, turnActive: Bool = false) {
+    public init(step: Int, finished: Bool, cookSpeaking: Bool, coachSpeaking: Bool, turnActive: Bool = false, stepText: String = "") {
       self.step = step; self.finished = finished; self.cookSpeaking = cookSpeaking; self.coachSpeaking = coachSpeaking
-      self.turnActive = turnActive
+      self.turnActive = turnActive; self.stepText = stepText
     }
   }
   /// What to do with an answer: say this (if anything), then this with the step.
@@ -40,6 +42,8 @@ public final class Mind {
   private let now: () -> Date
   private var eyes = Eyes()
   private var guardrails = Guardrails()
+  private var lines = LineGate()
+  private var step = 0
   private var inFlight = false
   private var pending: WakeReason?
   private var previous: String?
@@ -64,6 +68,7 @@ public final class Mind {
   public func note(_ kind: Timeline.Kind, _ text: String) {
     timeline.add(kind, text, at: now())
     if kind == .cook || kind == .coach { lastSpeech = now() }
+    if kind == .coach { lines.spoke(text, step: step, at: now()) }
   }
 
   /// The cook spoke to the coach (their words are a spoken wake of the same mind): they're here, the heartbeat
@@ -88,6 +93,7 @@ public final class Mind {
   /// answer, already through the guardrails — or nil.
   public func tick(_ state: () -> Now) async -> Outcome? {
     var s = state()
+    step = s.step
     if s.coachSpeaking || s.cookSpeaking { lastSpeech = now() }
     if stopped || s.finished || inFlight || s.turnActive { return nil }
     guard let f = frame() else { return nil }
@@ -122,6 +128,9 @@ public final class Mind {
       return nil
     }
     var say = answer.say, step = answer.step
+    if let line = say, !lines.allows(line, kind: answer.kind ?? .cue, step: s.step, stepText: s.stepText, at: now()) {
+      say = nil
+    }
     if (say != nil || step == .next),
        !guardrails.allows(cookSpeaking: s.cookSpeaking, coachSpeaking: s.coachSpeaking, finished: s.finished) {
       say = nil

@@ -119,7 +119,9 @@ public struct MindAnswer: Codable, Sendable, Equatable {
   public let say: String?
   public let step: StepCall
   public let usage: ObserveUsage
-  public init(seen: [String], say: String?, step: StepCall, usage: ObserveUsage) {
-    self.seen = seen; self.say = say; self.step = step; self.usage = usage
+  /// What the line is for (`LineGate` decides whether a cue is said); absent, a cue.
+  public var kind: LineKind?
+  public init(seen: [String], say: String?, step: StepCall, usage: ObserveUsage, kind: LineKind? = nil) {
+    self.seen = seen; self.say = say; self.step = step; self.usage = usage; self.kind = kind
   }
 }

@@ -93,6 +93,66 @@ class Guardrails:
         self.last = t
 
 
+# The gates (Gates.swift) — decisions in code, not the model's. Keep equal to the phone.
+STOP = {"the", "and", "that", "this", "now", "just", "get", "then", "with", "your", "you", "out", "for", "its", "it's",
+        "one", "all", "there", "here", "nice", "good", "right", "that's", "let's", "into", "onto", "over", "keep", "bit",
+        "too", "those", "these", "them", "some", "more", "little"}
+SAME_AS, CUE_GAP, CUES_PER_STEP, FOLLOW_UP = 0.5, 6.0, 3, 8.0
+
+
+def content_words(s):
+    out = set()
+    for w in re.split(r"[^a-z]+", s.lower()):
+        if len(w) >= 3 and w not in STOP:
+            out.add(w[:-1] if w.endswith("s") and len(w) > 4 else w)
+    return out
+
+
+def overlap(a, b):
+    x, y = content_words(a), content_words(b)
+    return len(x & y) / len(x) if x and y else 0.0
+
+
+class LineGate:
+    def __init__(self):
+        self.step, self.said, self.cues, self.last = -1, [], 0, -1e9
+
+    def enter(self, step):
+        if step != self.step:
+            self.step, self.said, self.cues = step, [], 0
+
+    def spoke(self, line, step, t):
+        self.enter(step)
+        self.said.append(line)
+        self.last = t
+
+    def allows(self, line, kind, step, step_text, t):
+        self.enter(step)
+        if kind in ("mistake", "done", "away"):
+            return True
+        if self.cues >= CUES_PER_STEP or t - self.last < CUE_GAP - 1e-6:
+            return False
+        if overlap(line, step_text) >= SAME_AS or any(overlap(line, m) >= SAME_AS for m in self.said):
+            return False
+        self.cues += 1
+        return True
+
+
+def addressed(words, name, since_coach):
+    lower = words.lower()
+    tokens = [w for w in re.split(r"[^a-z']+", lower) if w]
+    if name and name.lower() in tokens:
+        return True
+    if any(w in ("she", "her", "he", "him", "they") for w in tokens):
+        return False
+    to_you = any(w in ("you", "you're", "your", "you've", "you'll") for w in tokens)
+    asks = "?" in lower or (tokens[:1] and tokens[0] in ("how", "what", "is", "does", "do", "can", "should", "where",
+                                                          "when", "which", "why", "tell", "show"))
+    if asks and ("?" in lower or len(tokens) >= 3) and (to_you or len(tokens) >= 3):
+        return True
+    return since_coach <= FOLLOW_UP and len(tokens) >= 3
+
+
 class Timeline:
     def __init__(self):
         self.entries = []
@@ -234,7 +294,7 @@ def replay(folder, recipe, worker=None, spoken=True):
 
     st = {"step": 0, "held": False, "finished": False, "step_start": start, "eye_busy": -1, "turn_busy": -1,
           "coach_until": -1, "last_speech": start, "last_turn_start": -1e9, "seen_frame": None}
-    eyes, guard, tl = Eyes(), Guardrails(), Timeline()
+    eyes, guard, tl, gate = Eyes(), Guardrails(), Timeline(), LineGate()
     rows, wakes, spent, latencies, says = [], {"changed": 0, "heartbeat": 0, "spoke": 0, "timer": 0}, 0.0, [], []
     q, seq = [], 0
 
@@ -251,6 +311,7 @@ def replay(folder, recipe, worker=None, spoken=True):
         at = max(t, st["coach_until"])
         st["coach_until"] = at + speech_seconds(line)
         talk.append((at, st["coach_until"], "coach"))
+        gate.spoke(line, st["step"], at)
         st["last_speech"] = st["coach_until"]
         tl.add(at, "coach", line)
         rows.append((at, "mind", ("» " if unprompted else "") + line))
@@ -319,6 +380,9 @@ def replay(folder, recipe, worker=None, spoken=True):
             if stale:
                 rows.append((t, "mind", "  (stale: dropped)"))
                 continue
+            if a["say"] and not gate.allows(a["say"], a.get("kind", "cue"), st["step"], steps[st["step"]], t):
+                rows.append((t, "mind", f"  (gate: {a.get('kind', 'cue')} not said)"))
+                a = {**a, "say": None}
             if a["say"] or a["step"] == "next":
                 if guard.allows(t, cook_speaking(t), t < st["coach_until"], st["finished"]):
                     if a["say"]:
@@ -352,6 +416,9 @@ def replay(folder, recipe, worker=None, spoken=True):
             if what == "repeat":
                 coach_say(t + 0.1, f"Step {st['step'] + 1}: {steps[st['step']]}")
                 continue
+            if what == "question" and not addressed(words, "Serena", max(0.0, t - st["coach_until"])):
+                rows.append((t, "mind", "[aside: not answered]"))
+                continue
             if not worker or not spoken:
                 rows.append((t, "mind", "[spoken wake: not replayed]"))
                 continue
@@ -373,7 +440,13 @@ def replay(folder, recipe, worker=None, spoken=True):
         elif kind == "spoken":
             text, action, first, done, asked = payload
             if text:
-                coach_say(t, text)
+                # As the phone speaks an answer: sentence by sentence, and none after the first that reads the step back.
+                kept = []
+                for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
+                    if kept and overlap(sentence, steps[st["step"]]) >= 0.6:
+                        continue
+                    kept.append(sentence)
+                coach_say(t, " ".join(kept))
             rows.append((t, "mind", f"  [{action}] first word {first:.1f} s"))
             if action == "next":
                 advance(st["coach_until"])

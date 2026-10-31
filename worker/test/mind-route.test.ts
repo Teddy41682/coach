@@ -30,7 +30,7 @@ describe("POST /v1/mind (eye wakes)", () => {
   it("returns what the mind saw, said and decided, with the real usage", async () => {
     const r = await worker.handle(post(body), env, await deps());
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ seen: ["shook salt over the bowl"], say: null, step: "stay", usage: { input: 900, cachedInput: 100, output: 30 } });
+    expect(await r.json()).toEqual({ seen: ["shook salt over the bowl"], say: null, step: "stay", kind: "cue", usage: { input: 900, cachedInput: 100, output: 30 } });
   });
   it("needs the app key and a device", async () => {
     const { "X-Coach-Key": _, ...noKey } = H;

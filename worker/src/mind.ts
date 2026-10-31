@@ -31,7 +31,12 @@ export type MindContext = Omit<MindRequest, "sessionId"> & {
   stepIngredients?: string[];
 };
 
-export type MindAnswer = { seen: string[]; say: string | null; step: StepCall; usage: Usage };
+/** What an unprompted line is for. The phone always says a mistake, a finished step or a leaving/return; a cue or
+ *  a remark only when its gate allows (CoachKit `LineGate`): the decision is code's, not the model's. */
+export type LineKind = "mistake" | "done" | "away" | "cue" | "chat";
+const KINDS: LineKind[] = ["mistake", "done", "away", "cue", "chat"];
+
+export type MindAnswer = { seen: string[]; say: string | null; step: StepCall; kind?: LineKind; usage: Usage };
 
 export const MAX_TIMELINE = 50;
 export const TIMELINE_LINE = 200;
@@ -79,13 +84,14 @@ export async function wakeMind(ctx: MindContext, model: Completer): Promise<Mind
     return { seen: [], say: null, step: "stay", usage: NONE };
   }
   try {
-    const o = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as { seen?: unknown; say?: unknown; step?: unknown };
+    const o = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as { seen?: unknown; say?: unknown; step?: unknown; kind?: unknown };
     const seen = Array.isArray(o.seen)
       ? o.seen.filter((e): e is string => typeof e === "string" && e.trim() !== "").slice(0, MAX_SEEN).map((e) => e.trim().slice(0, SEEN_MAX))
       : [];
     const said = typeof o.say === "string" ? o.say.trim() : "";
     const step = STEPS.includes(o.step as StepCall) ? (o.step as StepCall) : "stay";
-    return { seen, say: said && said.length <= SAY_MAX ? said : null, step, usage };
+    const kind = KINDS.includes(o.kind as LineKind) ? (o.kind as LineKind) : "cue";
+    return { seen, say: said && said.length <= SAY_MAX ? said : null, step, kind, usage };
   } catch {
     return { seen: [], say: null, step: "stay", usage };
   }

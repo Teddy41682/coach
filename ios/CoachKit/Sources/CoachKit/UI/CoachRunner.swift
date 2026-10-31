@@ -164,7 +164,15 @@ public final class CoachRunner {
         if opening { heardHello = true }
         recorder?.note(.heard(words))
         heardAt = Date()
-        let intent = parseIntent(words)
+        var intent = parseIntent(words)
+        // Words not meant for the coach — an aside to someone else, a mutter, a cut-off fragment — are kept for
+        // context but never answered (`Addressed`, Katie's PB&J). The hello's answer always is.
+        if case .question = intent, !opening,
+           !Addressed.toCoach(words, name: name, sinceCoachSpoke: speaker.isSpeaking ? 0 : Date().timeIntervalSince(speaker.lastFinished)) {
+          recorder?.note(.note("aside, not answered"))
+          mind.note(.cook, words)
+          intent = .ignore
+        }
         // Speaking means they're here; their words join the timeline the mind is woken with.
         // A bare "okay" is not a turn: it must not throw away what the eyes were about to say. On his sixth PB&J
         // "That landed on the plate" was dropped because he'd said "Okay." a second before, and came 12 s late.
@@ -220,7 +228,8 @@ public final class CoachRunner {
         let outcome = await mind.tick {
           Mind.Now(step: session.stepIndex, finished: session.phase == .finished,
                    cookSpeaking: self.listener?.isHearing ?? false, coachSpeaking: self.speaker.isSpeaking,
-                   turnActive: self.turning || self.opening)
+                   turnActive: self.turning || self.opening,
+                   stepText: session.steps.indices.contains(session.stepIndex) ? session.steps[session.stepIndex].text : "")
         }
         self.away = mind.held
         guard let outcome, !self.stopped else { continue }

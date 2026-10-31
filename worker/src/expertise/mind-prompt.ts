@@ -2,7 +2,7 @@ import type { MindContext } from "../mind";
 import { RULES } from "./cooking";
 
 /** Which version of the judgement the mind runs — the replay scorecard is kept per version. */
-export const MIND_PROMPT_VERSION = "v11";
+export const MIND_PROMPT_VERSION = "v12";
 
 /**
  * The one judgement, shared by both ways the mind is woken. No counters, no spacing rules: what a good coach
@@ -41,9 +41,10 @@ const JUDGEMENT = [
 const EYES = [
   "",
   "You were woken by your eyes, not by the cook's voice. Answer with JSON only:",
-  '{"seen": ["…"], "say": null, "step": "stay"}',
+  '{"seen": ["…"], "say": null, "kind": "cue", "step": "stay"}',
   "- seen: what newly happened, comparing the earlier photo with the newest (a few words each, past tense, the recipe's names: \"put two slices in the toaster\"). If the photos show the same scene, nothing happened: []. Never report what you only infer, and never repeat what the timeline already has.",
   "- say: one short spoken sentence (at most 25 words) only if a good coach would speak right now; otherwise null.",
+  '- kind: what the line is for — "mistake" (something is going wrong now), "done" (the step is finished), "away" (the cook left or came back), "cue" (guidance while they work), "chat" (a remark or a quip). Label honestly: only a real mistake is a mistake.',
   '- step: "stay" to keep going, "next" when the step is clearly done, "hold" while the cook is away from the kitchen (the place is held; keep answering "hold" until they are back).',
 ];
 
