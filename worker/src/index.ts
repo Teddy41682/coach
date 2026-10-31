@@ -1,6 +1,7 @@
 import { cooking } from "./expertise/cooking";
 import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
+import { buildBrief } from "./expertise/cooking-pack/brief";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
 import { realMillicents, settleObserve } from "./limits";
@@ -145,14 +146,18 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     const recipe = (got.body as { recipe?: unknown } | null)?.recipe;
     if (!isRecipe(recipe)) return bad(400, "bad_recipe");
     if ((await checkAndCount(deps.usage, device, hstDay(deps.now()), LINK_CENTS)) !== "ok") return bad(429, "daily_limit");
-    const links = await linkSteps(recipe, deps.model("link"));
+    // The chef's brief: the model links ingredients to steps; code marks the risky measures from the pack.
+    const links = buildBrief(recipe, await linkSteps(recipe, deps.model("link")));
     const id = crypto.randomUUID();
     await deps.store.put({ id, device, recipe, links, createdAt: deps.now() });
     return Response.json({
       sessionId: id,
       steps: recipe.steps.map((text, index) => {
         const p = links[index] ?? { ingredients: [], done: "", mistakes: "", tip: "", hardToSee: false };
-        return { index, text, ingredients: p.ingredients, briefing: { done: p.done, mistakes: p.mistakes, tip: p.tip, hardToSee: p.hardToSee } };
+        const risky = (p.risky ?? []).map((r) => ({
+          item: r.item, amount: recipe.ingredients.find((i) => i.item.split(",")[0].trim() === r.item)?.amount ?? "" }));
+        return { index, text, ingredients: p.ingredients, risky,
+          briefing: { done: p.done, mistakes: p.mistakes, tip: p.tip, hardToSee: p.hardToSee } };
       }),
     });
   }

@@ -13,7 +13,11 @@ const SYSTEM = [
 ].join("\n");
 
 /** What the coach knows about one step before the cook starts: what goes in, and how to judge it. */
-export type StepPlan = { ingredients: string[]; done: string; mistakes: string; tip: string; method?: string; hardToSee: boolean };
+export type StepPlan = {
+  ingredients: string[]; done: string; mistakes: string; tip: string; method?: string; hardToSee: boolean;
+  /** The step's small, tight measures (cooking-pack/brief.ts): warned before, confirmed after. */
+  risky?: import("./expertise/cooking-pack/brief").Risky[];
+};
 
 const FIELD_MAX = 300;
 const field = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, FIELD_MAX) : "");

@@ -303,3 +303,14 @@ import Testing
     #expect(rig.said == ["Yep, that's the whole sandwich —", "enjoy it."])   // the opening clause goes out first
   }
 }
+
+@Suite struct LinkedStepDecodingTests {
+  @Test func readsRiskyMeasuresAndToleratesTheirAbsence() throws {
+    let with = #"{"index":1,"text":"Add the vanilla.","ingredients":["vanilla"],"risky":[{"item":"pure vanilla extract","amount":"1 tsp"}]}"#
+    let without = #"{"index":0,"text":"Cream.","ingredients":[]}"#
+    let a = try JSONDecoder().decode(LinkedStep.self, from: Data(with.utf8))
+    let b = try JSONDecoder().decode(LinkedStep.self, from: Data(without.utf8))
+    #expect(a.risky == [RiskyItem(item: "pure vanilla extract", amount: "1 tsp")])
+    #expect(b.risky == nil)
+  }
+}

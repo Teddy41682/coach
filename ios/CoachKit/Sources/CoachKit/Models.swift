@@ -20,7 +20,19 @@ public struct LinkedStep: Codable, Sendable, Equatable {
   public let index: Int
   public let text: String
   public let ingredients: [String]
-  public init(index: Int, text: String, ingredients: [String]) { self.index = index; self.text = text; self.ingredients = ingredients }
+  /// The step's small, tight measures, from the chef's brief: warned before, confirmed after. Absent from older
+  /// Workers.
+  public var risky: [RiskyItem]?
+  public init(index: Int, text: String, ingredients: [String], risky: [RiskyItem]? = nil) {
+    self.index = index; self.text = text; self.ingredients = ingredients; self.risky = risky
+  }
+}
+
+/// One risky measure in a step: "pure vanilla extract", "1 tsp".
+public struct RiskyItem: Codable, Sendable, Equatable {
+  public let item: String
+  public let amount: String
+  public init(item: String, amount: String) { self.item = item; self.amount = amount }
 }
 
 /// One line of the conversation so far.

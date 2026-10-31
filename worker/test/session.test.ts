@@ -20,8 +20,8 @@ describe("POST /v1/session", () => {
     expect(r.status).toBe(200);
     const body = await r.json() as { sessionId: string; steps: unknown };
     expect(body.steps).toEqual([
-      { index: 0, text: "Whisk the flour.", ingredients: ["flour"], briefing: { done: "No lumps.", mistakes: "", tip: "", hardToSee: false } },
-      { index: 1, text: "Beat in the eggs.", ingredients: ["eggs"], briefing: { done: "", mistakes: "", tip: "", hardToSee: false } },
+      { index: 0, text: "Whisk the flour.", ingredients: ["flour"], risky: [], briefing: { done: "No lumps.", mistakes: "", tip: "", hardToSee: false } },
+      { index: 1, text: "Beat in the eggs.", ingredients: ["eggs"], risky: [], briefing: { done: "", mistakes: "", tip: "", hardToSee: false } },
     ]);
     expect((await d.store.get(body.sessionId))?.links[0]).toMatchObject({ ingredients: ["flour"], done: "No lumps." });
   });
