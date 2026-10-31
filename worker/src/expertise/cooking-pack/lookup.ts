@@ -24,12 +24,14 @@ export function normaliseItem(item: string): string {
 
 const has = (text: string, phrase: string) => new RegExp(`(^|\\s)${phrase.replace(/[-&]/g, "\\$&")}(\\s|$)`).test(text);
 
-/** The roles an ingredient fills: its index entry, else the longest indexed phrase inside its name, else none. */
+/**
+ * The roles an ingredient fills: by its own normalised name or a declared alias, else none. Never by a word inside a
+ * longer name — rose water is not water, peanut butter is not butter — because a wrong role means a wrong verdict,
+ * and an unknown one only means the coach asks (his rule: a wrong rescue is worse than starting over).
+ */
 export function rolesFor(item: string, pack: Pack = PACK): Role[] {
   const name = normaliseItem(item);
-  const key = pack.index[name] ? name
-    : Object.keys(pack.index).filter((k) => has(name, k)).sort((a, b) => b.length - a.length)[0];
-  const ids = key ? pack.index[key] : [];
+  const ids = pack.index[name] ?? pack.index[pack.aliases[name] ?? ""] ?? [];
   return ids.map((id) => pack.roles.find((r) => r.id === id)).filter((r): r is Role => !!r);
 }
 

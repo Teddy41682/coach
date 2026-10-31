@@ -35,7 +35,7 @@ export const FIXTURE: Pack = {
     "vanilla": ["flavour-extract"], "vanilla extract": ["flavour-extract"], "almond extract": ["flavour-extract"],
     "baking soda": ["chemical-leavener-base"], "bicarbonate of soda": ["chemical-leavener-base"], "bicarbonate": ["chemical-leavener-base"],
     "baking powder": ["chemical-leavener-powder"], "salt": ["salt"], "kosher salt": ["salt"],
-    "water": ["liquid"], "stock": ["liquid"], "broth": ["liquid"],
+    "water": ["liquid"], "stock": ["liquid"], "broth": ["liquid"], "beef stock": ["liquid"], "chicken stock": ["liquid"],
     "flour": ["flour"], "all-purpose flour": ["flour"], "sugar": ["sugar"], "butter": ["fat-solid"], "egg": ["egg"], "milk": ["dairy"],
   },
   aliases: { "vanilla": "vanilla extract", "bicarbonate of soda": "baking soda", "bicarbonate": "baking soda" },
