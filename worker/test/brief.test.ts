@@ -13,6 +13,10 @@ describe("the chef's brief", () => {
     expect(kindOf({ title: "Jollof rice", ingredients: [{ amount: "2 cups", item: "long-grain rice" }], steps: ["Cook the rice in the sauce."] })).toBe("grains");
     expect(kindOf({ title: "Garlic chicken", ingredients: [], steps: ["Sear in a hot pan.", "Toss with the sauce."] })).toBe("saute");
     expect(kindOf({ title: "Salad", ingredients: [], steps: ["Toss."] })).toBe("other");
+    // The exam: a rice that simmers is still rice; a raw dressing is the uncooked kind the research files it under.
+    expect(kindOf({ title: "Steamed Rice", ingredients: [], steps: ["Bring to a boil.", "Cover and simmer for 18 minutes."] })).toBe("grains");
+    expect(kindOf({ title: "Lemon Vinaigrette", ingredients: [], steps: ["Whisk in the olive oil."] })).toBe("other");
+    expect(kindOf({ title: "Chicken and rice stew", ingredients: [], steps: ["Simmer for an hour."] })).toBe("braise");
   });
   it("marks the small, tight measures as risky — and nothing else", () => {
     const b = buildBrief(CUPCAKES, steps(["butter, softened", "sugar"], ["large eggs", "pure vanilla extract"],

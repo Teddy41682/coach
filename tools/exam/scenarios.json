@@ -1,0 +1,979 @@
+[
+ {
+  "name": "asks how much vanilla",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "oh no, way too much vanilla"
+  ],
+  "expect": {
+   "verdict": "ask"
+  }
+ },
+ {
+  "name": "vanilla 3x: pack is provisional → redo",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "oh no, way too much vanilla",
+   "about a tablespoon"
+  ],
+  "expect": {
+   "verdict": "redo",
+   "item": "pure vanilla extract"
+  }
+ },
+ {
+  "name": "vanilla a touch over: fine",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I think I put a bit too much vanilla, maybe a teaspoon and a quarter"
+  ],
+  "expect": {
+   "verdict": "fine",
+   "item": "pure vanilla extract"
+  }
+ },
+ {
+  "name": "vanilla: 'a glug' after asking → the safe answer, said once",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "way too much vanilla",
+   "like a glug"
+  ],
+  "expect": {
+   "verdict": "none",
+   "mentions": [
+    "redo"
+   ]
+  }
+ },
+ {
+  "name": "forgot the baking powder → add it",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 2,
+  "says": [
+   "I forgot the baking powder"
+  ],
+  "expect": {
+   "verdict": "fixable",
+   "item": "baking powder",
+   "mentions": [
+    "1½ tsp"
+   ]
+  }
+ },
+ {
+  "name": "baking soda tablespoon for teaspoon → redo",
+  "recipe": {
+   "title": "Chocolate Chip Cookies",
+   "ingredients": [
+    {
+     "amount": "2 1/4 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "baking soda"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "salt"
+    },
+    {
+     "amount": "1 cup",
+     "item": "butter"
+    },
+    {
+     "amount": "3/4 cup",
+     "item": "brown sugar"
+    },
+    {
+     "amount": "2",
+     "item": "eggs"
+    }
+   ],
+   "steps": [
+    "Whisk the flour, baking soda and salt.",
+    "Cream the butter and brown sugar, beat in the eggs.",
+    "Fold in the flour and bake at 375°F for 10 minutes."
+   ]
+  },
+  "step": 0,
+  "says": [
+   "I put a tablespoon of baking soda in instead of a teaspoon"
+  ],
+  "expect": {
+   "verdict": "redo",
+   "item": "baking soda"
+  }
+ },
+ {
+  "name": "bicarbonate alias → baking soda",
+  "recipe": {
+   "title": "Chocolate Chip Cookies",
+   "ingredients": [
+    {
+     "amount": "2 1/4 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "baking soda"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "salt"
+    },
+    {
+     "amount": "1 cup",
+     "item": "butter"
+    },
+    {
+     "amount": "3/4 cup",
+     "item": "brown sugar"
+    },
+    {
+     "amount": "2",
+     "item": "eggs"
+    }
+   ],
+   "steps": [
+    "Whisk the flour, baking soda and salt.",
+    "Cream the butter and brown sugar, beat in the eggs.",
+    "Fold in the flour and bake at 375°F for 10 minutes."
+   ]
+  },
+  "step": 0,
+  "says": [
+   "I used a tablespoon of bicarbonate of soda by mistake"
+  ],
+  "expect": {
+   "verdict": "redo",
+   "item": "baking soda"
+  }
+ },
+ {
+  "name": "salt doubled in a stew → fixable",
+  "recipe": {
+   "title": "Beef Stew",
+   "ingredients": [
+    {
+     "amount": "2 lb",
+     "item": "beef chuck"
+    },
+    {
+     "amount": "4 cups",
+     "item": "beef stock"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "salt"
+    },
+    {
+     "amount": "2 tbsp",
+     "item": "soy sauce"
+    }
+   ],
+   "steps": [
+    "Brown the beef.",
+    "Add the stock, soy sauce and salt.",
+    "Simmer covered for 2 hours."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I put two teaspoons of salt in instead of one"
+  ],
+  "expect": {
+   "verdict": "fixable",
+   "item": "salt"
+  }
+ },
+ {
+  "name": "salt 3× in rice → redo (the only rescue is provisional)",
+  "recipe": {
+   "title": "Steamed Rice",
+   "ingredients": [
+    {
+     "amount": "1 cup",
+     "item": "long-grain rice"
+    },
+    {
+     "amount": "1 1/2 cups",
+     "item": "water"
+    },
+    {
+     "amount": "1/2 tsp",
+     "item": "salt"
+    }
+   ],
+   "steps": [
+    "Rinse the rice.",
+    "Add the rice, water and salt to a pot and bring to a boil.",
+    "Cover and simmer for 18 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I put a teaspoon and a half of salt in by mistake"
+  ],
+  "expect": {
+   "verdict": "redo",
+   "item": "salt"
+  }
+ },
+ {
+  "name": "water 1⅔× in rice → drain it like pasta",
+  "recipe": {
+   "title": "Steamed Rice",
+   "ingredients": [
+    {
+     "amount": "1 cup",
+     "item": "long-grain rice"
+    },
+    {
+     "amount": "1 1/2 cups",
+     "item": "water"
+    },
+    {
+     "amount": "1/2 tsp",
+     "item": "salt"
+    }
+   ],
+   "steps": [
+    "Rinse the rice.",
+    "Add the rice, water and salt to a pot and bring to a boil.",
+    "Cover and simmer for 18 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I put two and a half cups of water in by mistake"
+  ],
+  "expect": {
+   "verdict": "fixable",
+   "item": "water"
+  }
+ },
+ {
+  "name": "forgot the cornstarch in the sauce → add a slurry",
+  "recipe": {
+   "title": "Stir-fry Sauce",
+   "ingredients": [
+    {
+     "amount": "1 cup",
+     "item": "chicken stock"
+    },
+    {
+     "amount": "1 tbsp",
+     "item": "cornstarch"
+    },
+    {
+     "amount": "2 tbsp",
+     "item": "soy sauce"
+    }
+   ],
+   "steps": [
+    "Whisk the stock, soy sauce and cornstarch.",
+    "Simmer in the pan until glossy."
+   ]
+  },
+  "step": 0,
+  "says": [
+   "I forgot the cornstarch"
+  ],
+  "expect": {
+   "verdict": "fixable",
+   "item": "cornstarch"
+  }
+ },
+ {
+  "name": "soy sauce doubled in a stew",
+  "recipe": {
+   "title": "Beef Stew",
+   "ingredients": [
+    {
+     "amount": "2 lb",
+     "item": "beef chuck"
+    },
+    {
+     "amount": "4 cups",
+     "item": "beef stock"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "salt"
+    },
+    {
+     "amount": "2 tbsp",
+     "item": "soy sauce"
+    }
+   ],
+   "steps": [
+    "Brown the beef.",
+    "Add the stock, soy sauce and salt.",
+    "Simmer covered for 2 hours."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I added four tablespoons of soy sauce instead of two"
+  ],
+  "expect": {
+   "verdict": "fixable",
+   "item": "soy sauce"
+  }
+ },
+ {
+  "name": "lemon 2× in a vinaigrette → redo (dressing bands provisional at 2×)",
+  "recipe": {
+   "title": "Lemon Vinaigrette",
+   "ingredients": [
+    {
+     "amount": "1/4 cup",
+     "item": "lemon juice"
+    },
+    {
+     "amount": "3/4 cup",
+     "item": "olive oil"
+    },
+    {
+     "amount": "1/2 tsp",
+     "item": "salt"
+    }
+   ],
+   "steps": [
+    "Whisk the lemon juice and salt.",
+    "Whisk in the olive oil in a slow stream."
+   ]
+  },
+  "step": 0,
+  "says": [
+   "I added half a cup of lemon juice by mistake"
+  ],
+  "expect": {
+   "verdict": "redo",
+   "item": "lemon juice"
+  }
+ },
+ {
+  "name": "forgot the salt in the rice",
+  "recipe": {
+   "title": "Steamed Rice",
+   "ingredients": [
+    {
+     "amount": "1 cup",
+     "item": "long-grain rice"
+    },
+    {
+     "amount": "1 1/2 cups",
+     "item": "water"
+    },
+    {
+     "amount": "1/2 tsp",
+     "item": "salt"
+    }
+   ],
+   "steps": [
+    "Rinse the rice.",
+    "Add the rice, water and salt to a pot and bring to a boil.",
+    "Cover and simmer for 18 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I forgot the salt"
+  ],
+  "expect": {
+   "verdict": "fixable",
+   "item": "salt"
+  }
+ },
+ {
+  "name": "no buttermilk → a sourced swap",
+  "recipe": {
+   "title": "Buttermilk Pancakes",
+   "ingredients": [
+    {
+     "amount": "2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "2 cups",
+     "item": "buttermilk"
+    },
+    {
+     "amount": "2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "2 tbsp",
+     "item": "sugar"
+    }
+   ],
+   "steps": [
+    "Whisk the dry ingredients.",
+    "Stir in the buttermilk.",
+    "Cook on a hot griddle."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I don't have any buttermilk"
+  ],
+  "expect": {
+   "verdict": "none",
+   "mentions": [
+    "2 cups"
+   ]
+  }
+ },
+ {
+  "name": "cut the sugar in cookies → how far is safe",
+  "recipe": {
+   "title": "Chocolate Chip Cookies",
+   "ingredients": [
+    {
+     "amount": "2 1/4 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "baking soda"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "salt"
+    },
+    {
+     "amount": "1 cup",
+     "item": "butter"
+    },
+    {
+     "amount": "3/4 cup",
+     "item": "brown sugar"
+    },
+    {
+     "amount": "2",
+     "item": "eggs"
+    }
+   ],
+   "steps": [
+    "Whisk the flour, baking soda and salt.",
+    "Cream the butter and brown sugar, beat in the eggs.",
+    "Fold in the flour and bake at 375°F for 10 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "can I use less brown sugar?"
+  ],
+  "expect": {
+   "verdict": "none"
+  }
+ },
+ {
+  "name": "not a slip: a question",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 3,
+  "says": [
+   "how's the batter looking?"
+  ],
+  "expect": {
+   "verdict": "none"
+  }
+ },
+ {
+  "name": "not a slip: naming an ingredient",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "is the vanilla in this step?"
+  ],
+  "expect": {
+   "verdict": "none"
+  }
+ },
+ {
+  "name": "not in the recipe: dragon fruit",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I added a dragon fruit"
+  ],
+  "expect": {
+   "verdict": "none"
+  }
+ },
+ {
+  "name": "rose water is a potent flavouring, not water → redo",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "rose water"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I put a tablespoon of rose water in by mistake"
+  ],
+  "expect": {
+   "verdict": "redo",
+   "item": "rose water"
+  }
+ },
+ {
+  "name": "grams against teaspoons can't compare → safe",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I put ten grams of vanilla in by mistake"
+  ],
+  "expect": {
+   "verdict": "unknown",
+   "item": "pure vanilla extract"
+  }
+ },
+ {
+  "name": "almond extract isn't vanilla",
+  "recipe": {
+   "title": "Vanilla Cupcakes",
+   "ingredients": [
+    {
+     "amount": "1 1/2 cups",
+     "item": "all-purpose flour"
+    },
+    {
+     "amount": "1 cup",
+     "item": "sugar"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "butter, softened"
+    },
+    {
+     "amount": "2",
+     "item": "large eggs"
+    },
+    {
+     "amount": "1 tsp",
+     "item": "pure vanilla extract"
+    },
+    {
+     "amount": "1 1/2 tsp",
+     "item": "baking powder"
+    },
+    {
+     "amount": "1/2 cup",
+     "item": "milk"
+    }
+   ],
+   "steps": [
+    "Cream the butter and sugar until pale.",
+    "Beat in the eggs, then the vanilla.",
+    "Whisk the flour and baking powder.",
+    "Fold in the flour, alternating with the milk.",
+    "Fill the liners and bake at 350°F for 18 to 20 minutes."
+   ]
+  },
+  "step": 1,
+  "says": [
+   "I added almond extract instead"
+  ],
+  "expect": {
+   "verdict": "none"
+  }
+ }
+]

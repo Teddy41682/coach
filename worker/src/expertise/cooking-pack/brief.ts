@@ -18,6 +18,12 @@ const SMALL_ML = 2 * 14.79, SMALL_G = 30;
 export function kindOf(recipe: CoachRecipe): Kind {
   const text = `${recipe.title} ${recipe.steps.join(" ")} ${recipe.ingredients.map((i) => i.item).join(" ")}`.toLowerCase();
   const any = (...w: string[]) => w.some((x) => new RegExp(`\\b${x}`).test(text));
+  const titled = (...w: string[]) => w.some((x) => new RegExp(`\\b${x}`).test(recipe.title.toLowerCase()));
+  // What the dish is called comes first: a rice that simmers is rice; a stew with rice in it is a stew; a raw
+  // dressing is uncooked ("other": the research's kind for dressings, dips and sauces mixed but not cooked).
+  if (titled("stew", "braise", "curry", "chili")) return "braise";
+  if (titled("rice", "quinoa", "risotto", "oats", "couscous", "pilaf", "jollof")) return "grains";
+  if (titled("vinaigrette", "dressing", "dip", "salsa", "salad", "aioli", "mayo")) return "other";
   if (any("pastry", "pie crust", "puff", "croissant", "laminat")) return "pastry";
   if (any("bake", "oven", "°f", "°c", "loaf", "muffin", "cupcake", "cake", "cookie", "boule", "dough")) return "baking";
   if (any("braise", "simmer", "stew", "slow cook", "pressure cook")) return "braise";
