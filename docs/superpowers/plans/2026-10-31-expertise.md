@@ -85,7 +85,7 @@ expect(speakAmount(scaleAmount({ value: 1, unit: "cup" }, 0.5))).toBe("½ cup");
 ### Task 2: The pack's shape, its validator, and the first roles
 
 **Files:**
-- Create: `worker/src/expertise/cooking/types.ts`, `worker/src/expertise/cooking/roles/*.ts` (one file per role group), `worker/src/expertise/cooking/index.ts` (assembles `PACK`), `worker/src/expertise/cooking/validate.ts`
+- Create: `worker/src/expertise/cooking-pack/types.ts`, `worker/src/expertise/cooking-pack/roles/*.ts` (one file per role group), `worker/src/expertise/cooking-pack/index.ts` (assembles `PACK`), `worker/src/expertise/cooking-pack/validate.ts`
 - Test: `worker/test/pack.test.ts`
 
 **Interfaces:**
@@ -109,7 +109,7 @@ expect(speakAmount(scaleAmount({ value: 1, unit: "cup" }, 0.5))).toBe("½ cup");
 
 ### Task 2R: Researching the pack (Imogen, in parallel with Tasks 3–9)
 
-**Files:** `worker/src/expertise/cooking/roles/*.ts`; research notes in `docs/research/expertise/<group>.md` (sources and the reasoning behind each band).
+**Files:** `worker/src/expertise/cooking-pack/roles/*.ts`; research notes in `docs/research/expertise/<group>.md` (sources and the reasoning behind each band).
 
 - [ ] **Step 1:** Batch the roles by group in Task 0's frequency order: (a) leaveners, salt, sugars, extracts/spices; (b) fats, eggs, dairy; (c) flours, starches, thickeners, liquids, acids; (d) proteins by doneness, aromatics, heat/time/mixing. One `anthropic-skills:deep-research` run per group (Opus), sources limited to recognised cookbooks, food-science references and test kitchens; each band, rescue, substitution and change cited ≥ 2 sources or marked `provisional`; where sources disagree, the safer verdict.
 - [ ] **Step 2:** Encode each group as role files; extend `index` with the top-120 items and their common aliases.
@@ -118,7 +118,7 @@ expect(speakAmount(scaleAmount({ value: 1, unit: "cup" }, 0.5))).toBe("½ cup");
 ### Task 3: Ingredients to roles
 
 **Files:**
-- Create: `worker/src/expertise/cooking/lookup.ts`
+- Create: `worker/src/expertise/cooking-pack/lookup.ts`
 - Test: `worker/test/lookup.test.ts`
 
 **Interfaces:**
@@ -136,7 +136,7 @@ expect(speakAmount(scaleAmount({ value: 1, unit: "cup" }, 0.5))).toBe("½ cup");
 
 **Files:**
 - Modify: `worker/src/link.ts` (StepPlan, SYSTEM, parse), `worker/src/index.ts:~150` (`/v1/session` response)
-- Create: `worker/src/expertise/cooking/brief.ts`
+- Create: `worker/src/expertise/cooking-pack/brief.ts`
 - Modify: `ios/CoachKit/Sources/CoachKit/Models.swift` (`LinkedStep`)
 - Test: `worker/test/brief.test.ts`, `worker/test/link.test.ts`, `ios/CoachKit/Tests/CoachKitTests/CoachSessionTests.swift` (decode)
 
@@ -155,7 +155,7 @@ expect(speakAmount(scaleAmount({ value: 1, unit: "cup" }, 0.5))).toBe("½ cup");
 ### Task 5: The verdict engine
 
 **Files:**
-- Create: `worker/src/expertise/cooking/verdict.ts`
+- Create: `worker/src/expertise/cooking-pack/verdict.ts`
 - Test: `worker/test/verdict.test.ts`
 
 **Interfaces:**
@@ -184,7 +184,7 @@ rule("vanilla extract", {value: 10, unit:"g"}, cupcakes, "baking").verdict === "
 ### Task 6: Slip turns — spot, rule, phrase
 
 **Files:**
-- Create: `worker/src/expertise/cooking/slip.ts`
+- Create: `worker/src/expertise/cooking-pack/slip.ts`
 - Modify: `worker/src/index.ts` (`/v1/mind` spoken branch), `worker/src/turn.ts` (a `verdict` SSE event)
 - Test: `worker/test/slip.test.ts`, `worker/test/mind-route.test.ts`
 
@@ -207,7 +207,7 @@ rule("vanilla extract", {value: 10, unit:"g"}, cupcakes, "baking").verdict === "
 ### Task 7: Substitutions and changes
 
 **Files:**
-- Create: `worker/src/expertise/cooking/change.ts`
+- Create: `worker/src/expertise/cooking-pack/change.ts`
 - Modify: `worker/src/index.ts` (spoken branch, after `detectSlip`)
 - Test: `worker/test/change.test.ts`
 
