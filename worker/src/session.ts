@@ -8,11 +8,14 @@ export type SessionRow = {
   /** Per step, from `linkSteps`: the ingredients that go in, and the briefing. */
   links: StepPlan[];
   createdAt: number;
+  /** The batch size after a scale-up rescue; 1 until one. */
+  scale?: number;
 };
 
 export interface SessionStore {
   put(row: SessionRow): Promise<void>;
   get(id: string): Promise<SessionRow | null>;
+  setScale(id: string, scale: number): Promise<void>;
 }
 
 /** For tests. */
@@ -20,6 +23,7 @@ export class MemorySessionStore implements SessionStore {
   private rows = new Map<string, SessionRow>();
   async put(row: SessionRow) { this.rows.set(row.id, row); }
   async get(id: string) { return this.rows.get(id) ?? null; }
+  async setScale(id: string, scale: number) { const r = this.rows.get(id); if (r) r.scale = scale; }
 }
 
 export class D1SessionStore implements SessionStore {
@@ -32,12 +36,16 @@ export class D1SessionStore implements SessionStore {
   }
   async get(id: string) {
     const row = await this.db
-      .prepare("SELECT id, device, recipe_json, links_json, created_at FROM sessions WHERE id = ?1")
+      .prepare("SELECT id, device, recipe_json, links_json, created_at, scale FROM sessions WHERE id = ?1")
       .bind(id)
-      .first<{ id: string; device: string; recipe_json: string; links_json: string; created_at: number }>();
+      .first<{ id: string; device: string; recipe_json: string; links_json: string; created_at: number; scale: number }>();
     return row
-      ? { id: row.id, device: row.device, recipe: JSON.parse(row.recipe_json), links: upgrade(JSON.parse(row.links_json)), createdAt: row.created_at }
+      ? { id: row.id, device: row.device, recipe: JSON.parse(row.recipe_json), links: upgrade(JSON.parse(row.links_json)),
+          createdAt: row.created_at, scale: row.scale ?? 1 }
       : null;
+  }
+  async setScale(id: string, scale: number) {
+    await this.db.prepare("UPDATE sessions SET scale = ?2 WHERE id = ?1").bind(id, scale).run();
   }
 }
 

@@ -1,7 +1,9 @@
 import { cooking } from "./expertise/cooking";
 import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
-import { buildBrief } from "./expertise/cooking-pack/brief";
+import { buildBrief, kindOf } from "./expertise/cooking-pack/brief";
+import { detectSlip, scaleRecipe, slipEvents } from "./expertise/cooking-pack/slip";
+import type { Pack } from "./expertise/cooking-pack/types";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
 import { realMillicents, settleObserve } from "./limits";
@@ -33,6 +35,8 @@ export type Deps = {
   store: SessionStore; usage: UsageStore; model: (purpose: Purpose) => ModelConnector; now: () => number;
   /** Muse's realtime transcription socket, opened; null when it wouldn't open. */
   muse?: () => Promise<Sock | null>;
+  /** The cooking knowledge pack (tests swap in a small one). */
+  pack?: Pack;
 };
 /** Measured 2026-10-27: linking alone used 281 reasoning + ~90 answer tokens and 400 truncated it; briefings add ~60 tokens a step. */
 export const LINK_MAX_TOKENS = 4_000;
@@ -235,12 +239,33 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (!session) return bad(404, "unknown_session");
     if (session.device !== device) return bad(403, "not_your_session");
     const plan = session.links[Math.min(m.stepIndex, Math.max(session.links.length - 1, 0))];
+    // After a scale-up rescue every amount is the bigger batch's, in the prompt and in later rulings.
+    const recipe = scaleRecipe(session.recipe, session.scale ?? 1);
     const ctx: MindContext = {
-      ...m, recipe: session.recipe, stepIngredients: plan?.ingredients ?? [],
+      ...m, recipe, stepIngredients: plan?.ingredients ?? [],
       briefing: { done: plan?.done ?? "", mistakes: plan?.mistakes ?? "", tip: plan?.tip ?? "", method: plan?.method ?? "", hardToSee: plan?.hardToSee ?? false },
     };
     const day = hstDay(deps.now());
     if (m.wake === "spoke") {
+      // A slip in the cook's words is ruled on in code (cooking-pack/slip.ts); the model only says the ruling.
+      const slip = detectSlip(m.utterance ?? "", m.timeline, recipe, deps.pack);
+      if (slip) {
+        if ((await checkAndCount(deps.usage, device, day, costOf(0))) !== "ok") {
+          const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
+          return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+        }
+        const events = slipEvents(slip, { recipe, kind: kindOf(session.recipe), timeline: m.timeline, model: deps.model("mind"), pack: deps.pack });
+        const store = deps.store, scale = session.scale ?? 1;
+        return new Response(new ReadableStream({
+          async start(controller) {
+            for await (const e of events) {
+              if (e.type === "verdict" && e.verdict === "fixable" && e.by) await store.setScale(m.sessionId, scale * e.by);
+              controller.enqueue(encodeEvent(e));
+            }
+            controller.close();
+          },
+        }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+      }
       // The cook's words: answered as a turn — streamed, charged like a turn — under the same judgement.
       const frames = m.frames ?? [];
       const turn: TurnRequest = { sessionId: m.sessionId, stepIndex: m.stepIndex, utterance: m.utterance ?? "", frames, seen: [] };

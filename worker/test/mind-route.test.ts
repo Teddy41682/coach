@@ -97,3 +97,37 @@ describe("POST /v1/mind (spoken wakes, streamed)", () => {
     expect(d.calls.stream).toBe(0);
   });
 });
+
+describe("POST /v1/mind — a slip in the cook's words is ruled on in code", async () => {
+  const { CUPCAKES, FIXTURE } = await import("./fixture-pack");
+  const { ASK } = await import("../src/expertise/cooking-pack/slip");
+  async function cupcakeDeps(phrase: string) {
+    const store = new MemorySessionStore();
+    await store.put({ id: "s1", device: "d1", recipe: CUPCAKES, links: CUPCAKES.steps.map(() => plan), createdAt: 0 });
+    const calls = { stream: 0 };
+    const model = { async *stream() { calls.stream++; yield phrase; }, async complete() { return { text: "{}", usage: { input: 0, cachedInput: 0, output: 0 } }; } };
+    return { store, usage: new MemoryUsageStore(), model: () => model, now: () => Date.parse("2026-10-27T20:00:00Z"), pack: FIXTURE, calls };
+  }
+  const spoke = (utterance: string, timeline: string[] = []) => ({ sessionId: "s1", stepIndex: 1, wake: "spoke", timeline, quietFor: 0, utterance });
+  const events = async (r: Response) => (await r.text()).split("\n\n").filter(Boolean).map((l) => JSON.parse(l.slice(6)));
+
+  it("asks how much went in — no model call", async () => {
+    const d = await cupcakeDeps("unused");
+    const es = await events(await worker.handle(post(spoke("oh no, way too much vanilla")), env, d));
+    expect(es[0]).toEqual({ type: "text", text: ASK("pure vanilla extract") });
+    expect(d.calls.stream).toBe(0);
+  });
+  it("rules on the answer, says it with code's numbers, and remembers the bigger batch", async () => {
+    const d = await cupcakeDeps("Easy fix — make it 1.5× bigger: add ¾ cup all-purpose flour, ½ cup sugar, 1 large eggs, ¼ cup butter and ¼ cup milk.");
+    const es = await events(await worker.handle(post(spoke("about a tablespoon", [`0:41 coach: ${ASK("pure vanilla extract")}`])), env, d));
+    expect(es[0]).toMatchObject({ type: "verdict", verdict: "fixable", by: 1.5 });
+    expect(es.find((e) => e.type === "text").text).toContain("¾ cup all-purpose flour");
+    expect((await d.store.get("s1"))?.scale).toBe(1.5);
+  });
+  it("words that aren't a slip still go to the mind as before", async () => {
+    const d = await cupcakeDeps("Looking smooth.");
+    const es = await events(await worker.handle(post(spoke("how's the batter looking?")), env, d));
+    expect(es.some((e) => e.type === "verdict")).toBe(false);
+    expect(d.calls.stream).toBe(1);
+  });
+});

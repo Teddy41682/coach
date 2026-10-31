@@ -4,7 +4,9 @@ export type CoachEvent =
   | { type: "text"; text: string }
   | { type: "action"; action: "next" | "stay" | "hold" }
   | { type: "done" }
-  | { type: "error"; text: string };
+  | { type: "error"; text: string }
+  /** A slip's ruling, decided in code (cooking-pack/slip.ts) — for the exam; the phone ignores it. */
+  | { type: "verdict"; verdict: "fine" | "fixable" | "redo" | "unknown"; item: string; ratio: number | null; by?: number };
 
 const enc = new TextEncoder();
 
