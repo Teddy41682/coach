@@ -115,7 +115,12 @@ public final class Mind {
 
     // Read again now the answer is here: a line about a step already left, or after the cook spoke, is dropped.
     s = state()
-    if s.step != req.stepIndex || lastCookSpoke > t || s.turnActive { return nil }
+    if s.step != req.stepIndex || lastCookSpoke > t || s.turnActive {
+      // It saw the step done while the cook was talking: look again the moment the talk is over, rather than wait
+      // for the picture to change (Katie's PB&J: the cut was seen done, dropped, and she was asked for it twice more).
+      if answer.step == .next, s.step == req.stepIndex { pending = .changed }
+      return nil
+    }
     var say = answer.say, step = answer.step
     if (say != nil || step == .next),
        !guardrails.allows(cookSpeaking: s.cookSpeaking, coachSpeaking: s.coachSpeaking, finished: s.finished) {

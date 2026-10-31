@@ -9,6 +9,7 @@ Scores per recording (replay.py does the replaying; it reads the Worker key itse
   longest quiet  the longest stretch with nobody talking, from the first step to the finish — his "too quiet"
   quiet > 10 s   how many such stretches
   lines/min      unprompted lines a minute — his "too chatty" sits at the other end
+  all/min        every line the coach said a minute, answers included (Katie's run: 14/min live — "a train wreck")
   repeats        unprompted lines nearly the same as an earlier one
   first word     median seconds from his words to the coach's first word (the Worker's own time)
 Results append to ~/coach-recordings/bench.md. A full run costs roughly 10–15¢ a recording.
@@ -48,6 +49,7 @@ def score(r, labels):
         "longest_quiet": round(max(gaps, default=0), 1),
         "quiet_over_10": sum(1 for g in gaps if g > QUIET),
         "lines_per_min": round(len(lines) / r["minutes"], 1),
+        "all_per_min": round(len(said) / r["minutes"], 1),
         "repeats": repeats,
         "first_word": round(statistics.median(r["first_word"]), 2) if r["first_word"] else None,
         "finished": r["finished"],
@@ -63,8 +65,8 @@ def main():
     recipes = json.loads((HERE / "recipes.json").read_text())
     worker = rp.Worker("bench")
     out = [f"\n## Bench {time.strftime('%Y-%m-%d %H:%M')} {a.label}".rstrip(), "",
-           "| recording | catches | longest quiet | quiet > 10 s | lines/min | repeats | first word | finished |",
-           "|---|---|---:|---:|---:|---:|---:|---|"]
+           "| recording | catches | longest quiet | quiet > 10 s | lines/min | all/min | repeats | first word | finished |",
+           "|---|---|---:|---:|---:|---:|---:|---:|---|"]
     for stamp in a.stamps or BENCH:
         r = rp.replay(RECORDINGS / stamp, recipes["pbj"], worker=worker)
         s = score(r, labels.get(stamp, []))
@@ -72,7 +74,7 @@ def main():
         misses = ", ".join(w for w, t in s["catches"] if t is None)
         catches = f"{got}/{len(s['catches'])}" + (f" (missed: {misses})" if misses else "") if s["catches"] else "—"
         out.append(f"| {stamp} | {catches} | {s['longest_quiet']} s | {s['quiet_over_10']} | {s['lines_per_min']} | "
-                   f"{s['repeats']} | {s['first_word'] or '—'} s | {'yes' if s['finished'] else 'no'} |")
+                   f"{s['all_per_min']} | {s['repeats']} | {s['first_word'] or '—'} s | {'yes' if s['finished'] else 'no'} |")
         (RECORDINGS / stamp / f"replay{('-' + a.label) if a.label else ''}.md").write_text(rp.render(r))
         print(out[-1], flush=True)
     with open(RECORDINGS / "bench.md", "a") as f:

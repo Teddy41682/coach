@@ -81,6 +81,13 @@ describe("runTurn", () => {
     expect(events.slice(-2)).toEqual([{ type: "action", action: "next" }, { type: "done" }]);
   });
 
+  it("a reply of only [[stay]] says nothing — words not meant for the coach go unanswered (Katie's PB&J)", async () => {
+    const model = fake(async function* () { yield "[[stay]]"; });
+    const events = (await collect(runTurn(req({ frames: [] }), model))).map((e) => e.event);
+    expect(events.filter((e) => e.type === "text")).toEqual([]);
+    expect(events).toEqual([{ type: "action", action: "stay" }, { type: "done" }]);
+  });
+
   it("an apology carries no action", async () => {
     const model = fake(async function* () { throw new Error("boom"); });
     const events = (await collect(runTurn(req(), model))).map((e) => e.event);

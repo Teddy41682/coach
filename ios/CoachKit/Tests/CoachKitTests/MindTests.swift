@@ -126,6 +126,21 @@ import Testing
     #expect(rig.sent.isEmpty)
   }
 
+  @Test func aStepSeenDoneDuringASpokenTurnIsLookedAtAgainOnceItEnds() async {
+    let rig = MindRig(); let m = rig.mind()
+    rig.hold = true
+    let first = Task { await rig.tick(m, at: 1) }
+    while rig.gate == nil { await Task.yield() }
+    rig.state.turnActive = true
+    rig.answers = [MindRig.answer(say: "That's cut.", step: .next), MindRig.answer(say: "Two halves — done.", step: .next)]
+    rig.hold = false
+    rig.gate?.resume()
+    #expect(await first.value == nil)
+    rig.state.turnActive = false
+    // The same picture, so the eyes alone wouldn't wake it for 15 s — it looks again at once.
+    #expect(await rig.tick(m, at: 1.5) == Mind.Outcome(say: "Two halves — done.", step: .next))
+  }
+
   @Test func anAnswerLandingDuringASpokenTurnIsDropped() async {
     let rig = MindRig(); let m = rig.mind()
     rig.hold = true

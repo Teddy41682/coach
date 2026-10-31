@@ -156,3 +156,17 @@ describe("the mind's judgement, v10 (his eighth PB&J: 'some opportunity for humo
     expect(s).toContain("don't repeat a cue in new words");
   });
 });
+
+describe("the mind's judgement, v11 (Katie's PB&J: 59 lines in four minutes)", () => {
+  it("answers only what was said to it, never reads the step back, invents no rules", async () => {
+    const { mindSystem } = await import("../src/expertise/mind-prompt");
+    const ctx = { sessionId: "s", stepIndex: 0, wake: "spoke", timeline: [], quietFor: 0,
+      recipe: { title: "PB&J", ingredients: [], steps: ["Spread it."] }, stepIngredients: [],
+      briefing: { done: "", mistakes: "", tip: "", hardToSee: false } } as never;
+    const spoken = mindSystem(ctx, true);
+    expect(spoken).toContain("Answer only what was said to you");
+    expect(spoken).toContain("reply with only the [[stay]] line");
+    expect(spoken).toContain("never read it back or reword it");
+    expect(spoken).toContain("Don't invent requirements the recipe doesn't have");
+  });
+});
