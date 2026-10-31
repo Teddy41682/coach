@@ -67,6 +67,10 @@ public struct Eyes: Sendable {
   public static let working = 5.0
   /// A look anyway after this long with nothing else waking it (30 s left long silences on his third PB&J).
   public static let heartbeat = 15.0
+  /// While a step has a risky measure (a teaspoon of soda, a splash of vanilla) the eyes look more often, so the pour
+  /// is seen: wakes 1.5 s apart, and every 2.5 s while hands work.
+  public static let fastSpacing = 1.5, fastWorking = 2.5
+  public var faster = false
 
   private var reference: Thumb?
   private var history: [(at: Date, thumb: Thumb)] = []
@@ -81,11 +85,11 @@ public struct Eyes: Sendable {
     if busy { return nil }
     guard let reference else { return .changed }
     if let lastCall, now.timeIntervalSince(lastCall) >= Self.heartbeat { return .heartbeat }
-    if now.timeIntervalSince(lastEye) < Self.spacing - 1e-6 { return nil }
+    if now.timeIntervalSince(lastEye) < (faster ? Self.fastSpacing : Self.spacing) - 1e-6 { return nil }
     guard let before = history.last(where: { $0.at <= now.addingTimeInterval(-1 + 1e-6) }) else { return nil }
     let steady = thumb.diff(before.thumb) <= Self.steady
     guard thumb.diff(reference) >= Self.change else { return nil }
-    return steady || now.timeIntervalSince(lastEye) >= Self.working - 1e-6 ? .changed : nil
+    return steady || now.timeIntervalSince(lastEye) >= (faster ? Self.fastWorking : Self.working) - 1e-6 ? .changed : nil
   }
 
   /// The mind was called, shown `showing`. A spoken wake (`eye: false`) restarts the heartbeat, not the spacing.

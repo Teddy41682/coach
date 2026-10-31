@@ -16,9 +16,11 @@ import Testing
   var needs: [CoachSession.FrameNeed] = []
   var seen: [String] = []
 
-  func session(steps: [String] = ["Whisk the flour.", "Add the eggs.", "Rest it."]) -> CoachSession {
+  func session(steps: [String] = ["Whisk the flour.", "Add the eggs.", "Rest it."], risky: [Int: RiskyItem] = [:]) -> CoachSession {
     let recipe = CoachRecipe(title: "Pancakes", ingredients: [], steps: steps)
-    let linked = steps.enumerated().map { LinkedStep(index: $0.offset, text: $0.element, ingredients: []) }
+    let linked = steps.enumerated().map {
+      LinkedStep(index: $0.offset, text: $0.element, ingredients: [], risky: risky[$0.offset].map { [$0] })
+    }
     return CoachSession(
       recipe: recipe, sessionId: "s1", steps: linked,
       send: { [unowned self] t in
@@ -312,5 +314,56 @@ import Testing
     let b = try JSONDecoder().decode(LinkedStep.self, from: Data(without.utf8))
     #expect(a.risky == [RiskyItem(item: "pure vanilla extract", amount: "1 tsp")])
     #expect(b.risky == nil)
+  }
+}
+
+@MainActor @Suite struct RiskyMeasureTests {
+  let vanilla = RiskyItem(item: "vanilla extract", amount: "1 tsp")
+
+  @Test func aRiskyStepGetsThePreventCueRightAfterItIsRead() async {
+    let rig = Rig(); let s = rig.session(risky: [1: vanilla])
+    await s.handle(.next)
+    #expect(rig.said.suffix(2) == ["Next, add the eggs.", CoachSession.prevent(item: "vanilla extract")])
+  }
+
+  @Test func theCoachAsksHowMuchOnceBeforeMovingOnThenMovesOn() async {
+    let rig = Rig(); let s = rig.session(risky: [0: vanilla])
+    s.coachMovedOn(saidSomething: true)
+    #expect(s.stepIndex == 0)
+    #expect(rig.said.last == "How much vanilla extract went in?")
+    s.coachMovedOn(saidSomething: true)
+    #expect(s.stepIndex == 1)
+  }
+
+  @Test func doneOnARiskyStepAsksHowMuchFirst() async {
+    let rig = Rig(); let s = rig.session(risky: [0: vanilla])
+    await s.handle(.done)
+    #expect(rig.said == ["How much vanilla extract went in?"])
+    #expect(rig.turns.isEmpty)
+  }
+
+  @Test func theCooksOwnNextIsNeverHeldBack() async {
+    let rig = Rig(); let s = rig.session(risky: [0: vanilla])
+    await s.handle(.next)
+    #expect(s.stepIndex == 1)
+  }
+
+  @Test func theAskIsWordForWordWhatTheWorkerListensFor() {
+    // cooking-pack/slip.ts: ASK = (item) => `How much ${spoken(item)} went in?`
+    #expect(CoachSession.ask(item: "vanilla extract") == "How much vanilla extract went in?")
+  }
+}
+
+@Suite struct FasterEyesTests {
+  @Test func aRiskyStepIsLookedAtEveryOneAndAHalfSeconds() {
+    let t0 = Date(timeIntervalSince1970: 0)
+    let same = Thumb(pixels: Array(repeating: 100, count: 64))
+    let other = Thumb(pixels: Array(repeating: 0, count: 32) + Array(repeating: 200, count: 32))
+    var e = Eyes(); e.faster = true; e.woke(at: t0, showing: same)
+    _ = e.look(other, at: t0.addingTimeInterval(0.5), busy: false)
+    #expect(e.look(other, at: t0.addingTimeInterval(1.5), busy: false) == .changed)
+    var slow = Eyes(); slow.woke(at: t0, showing: same)
+    _ = slow.look(other, at: t0.addingTimeInterval(0.5), busy: false)
+    #expect(slow.look(other, at: t0.addingTimeInterval(1.5), busy: false) == nil)
   }
 }

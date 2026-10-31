@@ -89,6 +89,9 @@ public final class Mind {
   /// Wake at the next tick whatever the picture (a timer ended).
   public func wakeNow(_ reason: WakeReason) { pending = reason }
 
+  /// Look more often while the step has a risky measure (`Eyes.faster`).
+  public func lookFaster(_ on: Bool) { eyes.faster = on }
+
   /// Called twice a second. Wakes the mind if the eyes say so and nothing is in flight; returns what to do with its
   /// answer, already through the guardrails — or nil.
   public func tick(_ state: () -> Now) async -> Outcome? {

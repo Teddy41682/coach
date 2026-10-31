@@ -225,6 +225,7 @@ public final class CoachRunner {
       while !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(500))
         guard !Task.isCancelled, let self, !self.stopped else { return }
+        mind.lookFaster(session.riskyNow)
         let outcome = await mind.tick {
           Mind.Now(step: session.stepIndex, finished: session.phase == .finished,
                    cookSpeaking: self.listener?.isHearing ?? false, coachSpeaking: self.speaker.isSpeaking,

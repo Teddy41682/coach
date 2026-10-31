@@ -66,7 +66,7 @@ public final class CoachSession {
   public var onTimerEnded: (() -> Void)?
 
   /// The mind saw the step was done and moved on unprompted — on the last step, that finishes the recipe.
-  public func coachMovedOn(saidSomething: Bool) { advance(quietEnd: saidSomething) }
+  public func coachMovedOn(saidSomething: Bool) { advance(quietEnd: saidSomething, confirm: true) }
 
   /// Something the coach said outside a turn (the observer speaking up, holding the place), so turns build on it.
   public func noteCoach(_ line: String) { remember(.coach, line) }
@@ -79,9 +79,17 @@ public final class CoachSession {
 
   /// `quietEnd`: the coach has just said its piece, so finishing adds no line of its own ("Yep, that's the whole
   /// sandwich — enjoy it." then "That was the last step. Enjoy it." on his third PB&J).
-  private func advance(quietEnd: Bool = false) {
+  private func advance(quietEnd: Bool = false, confirm: Bool = false) {
     // Once finished, say nothing more about steps: the ending was said three times on his second cook.
     if phase == .finished { return }
+    // A risky measure is confirmed before the coach calls the step done — asked once (expertise spec 2026-10-31);
+    // the cook's answer goes to the Worker, which rules on it. The next "done" moves on whatever the answer was.
+    if confirm, let r = unconfirmed() {
+      confirmed.insert(stepIndex)
+      let line = Self.ask(item: r.item)
+      say(line); remember(.coach, line)
+      return
+    }
     if stepIndex + 1 >= steps.count { phase = .finished; if !quietEnd { say("That was the last step. Enjoy it.") }; return }
     stepIndex += 1; stepStartedAt = now(); speakStep()
   }
@@ -93,7 +101,23 @@ public final class CoachSession {
     let text = steps[stepIndex].text
     if back { say("Back to step \(stepIndex + 1): \(text)"); return }
     say(stepIndex == steps.count - 1 ? "Last one: \(text)" : "Next, \(text.prefix(1).lowercased() + text.dropFirst())")
+    // Before a small, tight measure: the one habit that prevents most slips.
+    for r in steps[stepIndex].risky ?? [] { say(Self.prevent(item: r.item)) }
   }
+
+  /// Steps whose risky measures were already asked about.
+  private var confirmed: Set<Int> = []
+  private func unconfirmed() -> RiskyItem? {
+    guard steps.indices.contains(stepIndex), !confirmed.contains(stepIndex) else { return nil }
+    return steps[stepIndex].risky?.first
+  }
+
+  /// Word for word what the Worker listens for (cooking-pack/slip.ts `ASK`): the cook's next words are the answer.
+  public static func ask(item: String) -> String { "How much \(item) went in?" }
+  public static func prevent(item: String) -> String { "Measure the \(item) into the spoon over the side, not over the bowl." }
+
+  /// Whether the current step has a risky measure: the eyes look more often while it does.
+  public var riskyNow: Bool { steps.indices.contains(stepIndex) && !(steps[stepIndex].risky ?? []).isEmpty }
 
   public func handle(_ intent: Intent) async {
     switch intent {
@@ -106,6 +130,12 @@ public final class CoachSession {
     case .repeatStep:
       speakStep()
     case .done:
+      if let r = unconfirmed() {
+        confirmed.insert(stepIndex)
+        let line = Self.ask(item: r.item)
+        say(line); remember(.coach, line)
+        return
+      }
       await ask("I've finished this step. Did I miss anything before I move on?", .acrossStep(since: stepStartedAt))
     case .back:
       await ask("I'm back. How is it looking?", .recent)
