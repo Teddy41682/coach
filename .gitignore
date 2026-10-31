@@ -5,3 +5,4 @@ node_modules/
 .swiftpm/
 tools/.replay-sessions.json
 tools/__pycache__/
+.superpowers/
