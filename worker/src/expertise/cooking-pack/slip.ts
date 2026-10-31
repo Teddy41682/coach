@@ -20,8 +20,10 @@ const FORGOT = /\b(forgot|forgotten|left out|didn't put|didn't add|never added)\
 const spoken = (item: string) => normaliseItem(item) || item;
 
 export const ASK = (item: string) => `How much ${spoken(item)} went in?`;
+/** What the coach says when the eyes think too much went in: still a question, never a number. */
+export const SEEN = (item: string) => `That looks like a lot of ${spoken(item)} — how much ${spoken(item)} went in?`;
 export const SAFE = (item: string) => `I can't be sure that'll come out right — let's redo that part with a fresh measure of ${spoken(item)}.`;
-const ASKED = /How much (.+) went in\?/;
+const ASKED = /how much (.+) went in\?/i;
 
 /** The newest thing the coach said, from the timeline ("0:41 coach: …"). */
 function lastCoachLine(timeline: string[]): string {

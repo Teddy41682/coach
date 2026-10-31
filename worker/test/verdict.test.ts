@@ -45,6 +45,50 @@ describe("verdicts in code", () => {
     const odd = { ...CUPCAKES, ingredients: [...CUPCAKES.ingredients, { amount: "1 tsp", item: "rose water" }] };
     expect(rule("rose water", { value: 3, unit: "tsp" }, odd, "baking", FIXTURE).verdict).toBe("unknown");
   });
+  it("a fixable band whose cut-point is provisional is a redo (doubt → redo)", () => {
+    const shaky = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "flavour-extract"
+      ? { ...r, bands: { default: r.bands.default.map((b) => (b.verdict === "fixable" ? { ...b, provisional: true } : b)) } } : r) };
+    expect(rule("pure vanilla extract", { value: 3, unit: "tsp" }, CUPCAKES, "baking", shaky).verdict).toBe("redo");
+    expect(rule("pure vanilla extract", { value: 1.5, unit: "tsp" }, CUPCAKES, "baking", shaky).verdict).toBe("fine");
+  });
+  it("chooses the role that has rules for this kind of cooking: butter in a sauté isn't cake butter", () => {
+    const S = ["a", "b"];
+    const fat = (id: string, tight: boolean, bands: Record<string, unknown>) => ({ id, name: id, does: id, tight, bands, rescues: [
+      { id: "fix", kind: "none" as const, say: id, sources: S }], substitutions: [], changes: [], shows: "", sources: S });
+    const p = { ...FIXTURE,
+      roles: [...FIXTURE.roles, fat("fat-creamed", true, { default: [{ below: 1.2, verdict: "fine" }, { below: Infinity, verdict: "redo" }] }),
+        fat("fat-cooking", false, { default: [{ below: 1.2, verdict: "fine" }, { below: Infinity, verdict: "redo" }],
+          saute: [{ below: 3, verdict: "fine" }, { below: Infinity, verdict: "fixable", rescue: "fix" }] })] as never,
+      index: { ...FIXTURE.index, butter: ["fat-creamed", "fat-cooking"] } };
+    const pan = { title: "Garlic chicken", ingredients: [{ amount: "1 tbsp", item: "butter" }], steps: ["Sear."] };
+    const r = rule("butter", { value: 2, unit: "tbsp" }, pan, "saute", p);
+    expect(r.role).toBe("fat-cooking");
+    expect(r.verdict).toBe("fine");
+  });
+  it("a rescue with a fixed amount adds that amount, not a scaled recipe quantity", () => {
+    const S = ["a", "b"];
+    const p = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "salt"
+      ? { ...r, rescues: r.rescues.map((x) => x.id === "dilute" ? { ...x, add: { role: "liquid", amount: "1/4 cup" } } : x) } : r) };
+    const stew = { title: "Stew", ingredients: [{ amount: "4 cups", item: "beef stock" }, { amount: "1 tsp", item: "salt" }], steps: ["Simmer."] };
+    expect(adds(rule("salt", { value: 2, unit: "tsp" }, stew, "braise", p))).toEqual(["¼ cup beef stock"]);
+    void S;
+  });
+  it("a per-unit-of-excess rescue the engine can't compute gives the technique, never a wrong number", () => {
+    const p = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "salt"
+      ? { ...r, rescues: r.rescues.map((x) => x.id === "dilute" ? { ...x, add: { role: "liquid", amount: "1 cup", per: 1 } } : x) } : r) };
+    const stew = { title: "Stew", ingredients: [{ amount: "4 cups", item: "beef stock" }, { amount: "1 tsp", item: "salt" }], steps: ["Simmer."] };
+    const r = rule("salt", { value: 2, unit: "tsp" }, stew, "braise", p);
+    expect(r.verdict).toBe("fixable");
+    expect(r.rescue?.adds).toEqual([]);
+  });
+  it("an amount written as text ('about ¼ tsp per extra Tbsp of lemon') is technique only — never read as a flat ¼ tsp", () => {
+    for (const amount of ["about ¼ tsp per extra Tbsp of lemon", "sour cream or yoghurt served with it", "1 tsp cornstarch slurried in 1 Tbsp water"]) {
+      const p = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "salt"
+        ? { ...r, rescues: r.rescues.map((x) => x.id === "dilute" ? { ...x, add: { role: "liquid", amount } } : x) } : r) };
+      const stew = { title: "Stew", ingredients: [{ amount: "4 cups", item: "beef stock" }, { amount: "1 tsp", item: "salt" }], steps: ["Simmer."] };
+      expect(rule("salt", { value: 2, unit: "tsp" }, stew, "braise", p).rescue?.adds).toEqual([]);
+    }
+  });
   it("a provisional rescue is never offered: redo", () => {
     const shaky = { ...FIXTURE, roles: FIXTURE.roles.map((r) => r.id === "flavour-extract"
       ? { ...r, rescues: r.rescues.map((x) => ({ ...x, provisional: true })) } : r) };

@@ -13,7 +13,7 @@ const UNIT_WORDS = /^(tsp|tbsp|tbs|teaspoons?|tablespoons?|cups?|ml|l|g|kg|oz|lb
 
 /** "1 tsp pure vanilla extract" → "vanilla extract"; "Large Eggs (room temperature)" → "egg". */
 export function normaliseItem(item: string): string {
-  const words = item.toLowerCase().replace(/\(.*?\)/g, " ").split(",")[0]
+  const words = item.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\(.*?\)/g, " ").split(",")[0]
     .replace(/[^a-z&\s-]/g, " ").split(/\s+/).filter(Boolean)
     .filter((w) => !DESCRIPTORS.has(w) && !UNIT_WORDS.test(w));
   if (!words.length) return "";
@@ -44,7 +44,7 @@ export function rolesFor(item: string, pack: Pack = PACK): Role[] {
 export function mentionedItem(
   utterance: string, recipe: CoachRecipe, pack: Pack = PACK,
 ): { item: string; recipeAmount: Amount | null } | null {
-  const said = ` ${utterance.toLowerCase().replace(/[^a-z&\s-]/g, " ").replace(/\s+/g, " ")} `;
+  const said = ` ${utterance.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z&\s-]/g, " ").replace(/\s+/g, " ")} `;
   let best: { item: string; recipeAmount: Amount | null; length: number } | null = null;
   for (const ing of recipe.ingredients) {
     const name = normaliseItem(ing.item);

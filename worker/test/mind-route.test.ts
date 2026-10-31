@@ -131,3 +131,18 @@ describe("POST /v1/mind — a slip in the cook's words is ruled on in code", asy
     expect(d.calls.stream).toBe(1);
   });
 });
+
+describe("POST /v1/mind — the eyes flag a slip; the route asks, with no number", async () => {
+  const { CUPCAKES, FIXTURE } = await import("./fixture-pack");
+  it("turns a flagged slip into the fixed question, labelled a mistake", async () => {
+    const store = new MemorySessionStore();
+    await store.put({ id: "s1", device: "d1", recipe: CUPCAKES, links: CUPCAKES.steps.map(() => plan), createdAt: 0 });
+    const model = { async *stream() { yield ""; }, async complete() {
+      return { text: '{"seen":["poured vanilla from the bottle"],"say":"Whoa, about three teaspoons!","kind":"mistake","step":"stay","slip":{"item":"vanilla extract"}}', usage: { input: 1, cachedInput: 0, output: 1 } }; } };
+    const d = { store, usage: new MemoryUsageStore(), model: () => model, now: () => Date.parse("2026-10-27T20:00:00Z"), pack: FIXTURE };
+    const r = await worker.handle(post({ ...body, stepIndex: 1 }), env, d);
+    const a = await r.json() as { say: string; kind: string };
+    expect(a.say).toBe("That looks like a lot of vanilla extract — how much vanilla extract went in?");
+    expect(a.kind).toBe("mistake");
+  });
+});

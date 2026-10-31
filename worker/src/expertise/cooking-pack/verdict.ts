@@ -4,6 +4,10 @@ import { PACK } from "./index";
 import { normaliseItem, rolesFor } from "./lookup";
 import type { Band, Kind, Pack, Role, Verdict } from "./types";
 
+/** A rescue amount the engine may use as a number: "¼ cup", "about 2 tbsp", "30 ml" — a quantity and a unit, nothing
+ *  else. */
+const PLAIN = /^(about\s+)?[\d¼½¾⅓⅔⅛⅜⅝⅞./\s]+\s*(tsp|tbsp|teaspoons?|tablespoons?|cups?|ml|g|grams?)\.?$/i;
+
 /** A bigger batch than this needs more than one pan and a different bake: it's a redo, not a rescue. */
 export const MAX_SCALE = 2;
 
@@ -28,7 +32,11 @@ const unknown = (item: string, reason: string, r: number | null = null): Ruling 
  */
 export function rule(item: string, said: Amount | null, recipe: CoachRecipe, kind: Kind, pack: Pack = PACK): Ruling {
   const roles = rolesFor(item, pack);
-  const role = roles.find((r) => r.tight) ?? roles[0];
+  // The role with rules for this kind of cooking first (butter in a sauté is cooking fat, not cake butter), then the
+  // tightest of them.
+  const forKind = roles.filter((r) => r.bands[kind]);
+  const pool = forKind.length ? forKind : roles;
+  const role = pool.find((r) => r.tight) ?? pool[0];
   if (!role) return unknown(item, "not in the pack");
   const line = recipe.ingredients.find((i) => normaliseItem(i.item) === normaliseItem(item));
   const recipeAmount = line ? parseAmount(line.amount) : null;
@@ -39,6 +47,7 @@ export function rule(item: string, said: Amount | null, recipe: CoachRecipe, kin
   const band = bands.find((b) => r < b.below) ?? bands[bands.length - 1];
   const base = { item, ratio: r, role: role.id, sources: role.sources };
   if (band.verdict !== "fixable") return { ...base, verdict: band.verdict, reason: `${band.verdict} for ${role.id}` };
+  if (band.provisional) return { ...base, verdict: "redo", reason: "the fixable range isn't sourced well enough to offer a rescue" };
   const rescue = role.rescues.find((x) => x.id === band.rescue);
   if (!rescue || rescue.provisional) return { ...base, verdict: "redo", reason: "no sourced rescue" };
   const said_ = { say: rescue.say, when: rescue.when };
@@ -49,7 +58,7 @@ export function rule(item: string, said: Amount | null, recipe: CoachRecipe, kin
     const adds = recipe.ingredients.filter((i) => i !== line)
       .map((i) => ({ item: i.item.split(",")[0].trim(), amount: parseAmount(i.amount), roles: rolesFor(i.item, pack) }))
       .filter((x): x is { item: string; amount: Amount; roles: Role[] } => !!x.amount)
-      .map((x) => ({ item: x.item, amount: scaleAmount(x.amount, by - 1), egg: x.roles.some((q) => q.id === "egg") }));
+      .map((x) => ({ item: x.item, amount: scaleAmount(x.amount, by - 1), egg: x.roles.some((q) => q.id === "egg" || q.id.startsWith("egg-")) }));
     if (adds.some((a) => a.egg && !Number.isInteger(a.amount.value * 2))) {
       return { ...base, verdict: "redo", reason: "would need part of an egg" };
     }
@@ -59,15 +68,24 @@ export function rule(item: string, said: Amount | null, recipe: CoachRecipe, kin
 
   if (rescue.kind === "add" && rescue.add) {
     const { role: addRole, per = 1 } = rescue.add;
+    // A rescue that names its own amount ("about ¼ cup water") adds exactly that, never a scaled recipe quantity.
+    const fixed = rescue.add.amount && PLAIN.test(rescue.add.amount.trim()) ? parseAmount(rescue.add.amount) : null;
+    // An amount that isn't a plain quantity — "per cup of excess liquid", "slurried in…", "served with it" — needs
+    // more than arithmetic to turn into a number, so the technique is said with no number rather than a wrong one.
+    if (rescue.add.amount && (!fixed || rescue.add.per !== undefined)) {
+      return { ...base, verdict: "fixable", reason: `${rescue.id} (amount per unit of excess: technique only)`, sources: rescue.sources,
+        rescue: { kind: "add", adds: [], ...said_ } };
+    }
     if (addRole === role.id) {
       // Not enough of it: put in what's missing.
-      const missing = scaleAmount(recipeAmount, Math.max(0, 1 - r));
+      const missing = fixed ?? scaleAmount(recipeAmount, Math.max(0, 1 - r));
       return { ...base, verdict: "fixable", reason: "add what's missing", sources: rescue.sources,
         rescue: { kind: "add", adds: [{ item: line!.item.split(",")[0].trim(), amount: missing }], ...said_ } };
     }
     const other = recipe.ingredients.find((i) => rolesFor(i.item, pack).some((q) => q.id === addRole));
     const otherAmount = other ? parseAmount(other.amount) : null;
-    const adds = other && otherAmount ? [{ item: other.item.split(",")[0].trim(), amount: scaleAmount(otherAmount, per * (r - 1)) }] : [];
+    const adds = other && (fixed || otherAmount)
+      ? [{ item: other.item.split(",")[0].trim(), amount: fixed ?? scaleAmount(otherAmount!, per * (r - 1)) }] : [];
     return { ...base, verdict: "fixable", reason: `balance with ${addRole}`, sources: rescue.sources, rescue: { kind: "add", adds, ...said_ } };
   }
 

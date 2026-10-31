@@ -2,7 +2,9 @@ import { cooking } from "./expertise/cooking";
 import type { CoachRecipe } from "./expertise/pack";
 import { linkSteps } from "./link";
 import { buildBrief, kindOf } from "./expertise/cooking-pack/brief";
-import { detectSlip, scaleRecipe, slipEvents } from "./expertise/cooking-pack/slip";
+import { SEEN, detectSlip, scaleRecipe, slipEvents } from "./expertise/cooking-pack/slip";
+import { mentionedItem } from "./expertise/cooking-pack/lookup";
+import { answerChange, changeEvents, detectChange } from "./expertise/cooking-pack/change";
 import type { Pack } from "./expertise/cooking-pack/types";
 import type { ModelConnector } from "./model/connector";
 import { MuseConnector } from "./model/muse";
@@ -266,6 +268,20 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
           },
         }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
       }
+      // A substitution or change the pack can answer is answered from it; one it can't goes to the mind as judgement.
+      const change = detectChange(m.utterance ?? "", recipe, deps.pack);
+      const grounded = change ? answerChange(change, recipe, deps.pack) : null;
+      if (grounded?.grounded) {
+        if ((await checkAndCount(deps.usage, device, day, costOf(0))) !== "ok") {
+          const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
+          return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+        }
+        const events = changeEvents(grounded, deps.model("mind"));
+        return new Response(new ReadableStream({
+          async start(controller) { for await (const e of events) controller.enqueue(encodeEvent(e)); controller.close(); },
+        }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+      }
+      const judgement = change ? "\nThis substitution or change is not in your knowledge pack: give your own judgement and say it is your judgement, or say you'd keep it as written." : "";
       // The cook's words: answered as a turn — streamed, charged like a turn — under the same judgement.
       const frames = m.frames ?? [];
       const turn: TurnRequest = { sessionId: m.sessionId, stepIndex: m.stepIndex, utterance: m.utterance ?? "", frames, seen: [] };
@@ -273,7 +289,7 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
         const said = new Blob([encodeEvent({ type: "text", text: LIMIT_LINE }), encodeEvent({ type: "done" })]);
         return new Response(said.stream(), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
       }
-      return new Response(runTurn(turn, deps.model("mind"), { system: mindSystem(ctx, true), user: mindUser(ctx) }), {
+      return new Response(runTurn(turn, deps.model("mind"), { system: mindSystem(ctx, true) + judgement, user: mindUser(ctx) }), {
         headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
       });
     }
@@ -283,6 +299,9 @@ async function handle(request: Request, env: Env, deps: Deps): Promise<Response>
     if (typeof model.complete !== "function") return bad(500, "no_completer");
     const answer = await wakeMind(ctx, model as Completer);
     await settleObserve(deps.usage, day, realMillicents(answer.usage));
+    // The eyes think too much of something went in: a fixed question, never a guessed number (expertise spec).
+    const seen = answer.slip && mentionedItem(answer.slip.item, recipe, deps.pack);
+    if (seen) return Response.json({ ...answer, say: SEEN(seen.item), kind: "mistake" });
     return Response.json(answer);
   }
 

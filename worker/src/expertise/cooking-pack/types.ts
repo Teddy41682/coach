@@ -13,7 +13,9 @@ export type Verdict = "fine" | "fixable" | "redo";
  * One band of a role's tolerance: applies to ratios (actual ÷ recipe amount) below `below`. Bands are sorted by
  * `below`; the first whose `below` exceeds the ratio applies; the last is `Infinity`. A ratio of 0 is "forgot it".
  */
-export type Band = { below: number; verdict: Verdict; rescue?: string };
+export type Band = { below: number; verdict: Verdict; rescue?: string;
+  /** The cut-point rests on fewer than two trusted sources: a fixable band here is treated as redo (doubt → redo). */
+  provisional?: boolean };
 
 /**
  * How a `fixable` band is put right. `scale`: make the batch proportionally bigger (capped by the verdict engine).

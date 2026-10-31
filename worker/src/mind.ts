@@ -36,7 +36,9 @@ export type MindContext = Omit<MindRequest, "sessionId"> & {
 export type LineKind = "mistake" | "done" | "away" | "cue" | "chat";
 const KINDS: LineKind[] = ["mistake", "done", "away", "cue", "chat"];
 
-export type MindAnswer = { seen: string[]; say: string | null; step: StepCall; kind?: LineKind; usage: Usage };
+export type MindAnswer = { seen: string[]; say: string | null; step: StepCall; kind?: LineKind; usage: Usage;
+  /** The eyes think an amount of this ingredient looks wrong — the route turns it into a fixed question, no numbers. */
+  slip?: { item: string } };
 
 export const MAX_TIMELINE = 50;
 export const TIMELINE_LINE = 200;
@@ -84,14 +86,15 @@ export async function wakeMind(ctx: MindContext, model: Completer): Promise<Mind
     return { seen: [], say: null, step: "stay", usage: NONE };
   }
   try {
-    const o = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as { seen?: unknown; say?: unknown; step?: unknown; kind?: unknown };
+    const o = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as { seen?: unknown; say?: unknown; step?: unknown; kind?: unknown; slip?: { item?: unknown } };
     const seen = Array.isArray(o.seen)
       ? o.seen.filter((e): e is string => typeof e === "string" && e.trim() !== "").slice(0, MAX_SEEN).map((e) => e.trim().slice(0, SEEN_MAX))
       : [];
     const said = typeof o.say === "string" ? o.say.trim() : "";
     const step = STEPS.includes(o.step as StepCall) ? (o.step as StepCall) : "stay";
     const kind = KINDS.includes(o.kind as LineKind) ? (o.kind as LineKind) : "cue";
-    return { seen, say: said && said.length <= SAY_MAX ? said : null, step, kind, usage };
+    const slip = typeof o.slip?.item === "string" && o.slip.item.trim() ? { item: o.slip.item.trim().slice(0, 100) } : undefined;
+    return { seen, say: said && said.length <= SAY_MAX ? said : null, step, kind, usage, ...(slip ? { slip } : {}) };
   } catch {
     return { seen: [], say: null, step: "stay", usage };
   }

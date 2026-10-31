@@ -44,6 +44,7 @@ const EYES = [
   '{"seen": ["…"], "say": null, "kind": "cue", "step": "stay"}',
   "- seen: what newly happened, comparing the earlier photo with the newest (a few words each, past tense, the recipe's names: \"put two slices in the toaster\"). If the photos show the same scene, nothing happened: []. Never report what you only infer, and never repeat what the timeline already has.",
   "- say: one short spoken sentence (at most 25 words) only if a good coach would speak right now; otherwise null.",
+  '- slip: only when an amount of a recipe ingredient going in looks clearly wrong (far too much poured, the wrong thing added): {"item": "<the ingredient as the recipe names it>"}; otherwise leave it out. Never guess a number — the phone asks the cook how much.',
   '- kind: what the line is for — "mistake" (something is going wrong now), "done" (the step is finished), "away" (the cook left or came back), "cue" (guidance while they work), "chat" (a remark or a quip). Label honestly: only a real mistake is a mistake.',
   '- step: "stay" to keep going, "next" when the step is clearly done, "hold" while the cook is away from the kitchen (the place is held; keep answering "hold" until they are back).',
 ];
