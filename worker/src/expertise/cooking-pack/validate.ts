@@ -29,7 +29,10 @@ export function validatePack(p: Pack): string[] {
       if (x.add && !ids.has(x.add.role)) errors.push(`role ${r.id} rescue ${x.id}: adds unknown role ${x.add.role}`);
     }
     r.substitutions.forEach((s, i) => sourced(`role ${r.id} substitution ${i} (${s.use})`, s.sources, s.provisional));
-    r.changes.forEach((c, i) => sourced(`role ${r.id} change ${i} (${c.direction})`, c.sources, c.provisional));
+    r.changes.forEach((c, i) => {
+      sourced(`role ${r.id} change ${i} (${c.direction})`, c.sources, c.provisional);
+      if (!(c.upTo > 0 && c.upTo <= 2)) errors.push(`role ${r.id} change ${i} (${c.direction}): upTo ${c.upTo} is not a fraction of the recipe amount (0 < upTo ≤ 2)`);
+    });
   }
   for (const [alias, name] of Object.entries(p.aliases)) {
     if (!p.index[name]) errors.push(`alias ${alias}: ${name} is not in the index`);

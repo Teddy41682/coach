@@ -3,7 +3,7 @@ import type { ModelConnector } from "../../model/connector";
 import type { CoachEvent } from "../../sse";
 import { parseAmount, scaleAmount, speakAmount } from "../amount";
 import { PACK } from "./index";
-import { mentionedItem, normaliseItem, rolesFor } from "./lookup";
+import { mentionedItems, normaliseItem, rolesFor, saidText } from "./lookup";
 import type { Pack } from "./types";
 
 /**
@@ -14,15 +14,36 @@ import type { Pack } from "./types";
 export type ChangeAsk = { item: string; ask: "substitute" | "less" | "more" };
 
 const SUBSTITUTE = /\b(don'?t have|do not have|out of|ran out|run out|no more|instead of|swap|substitute|replace|use something else)\b/;
-const LESS = /\b(less|cut|reduce|halve|lower|lighter|skip)\b/;
-const MORE = /\b(more|double|extra|increase|add some)\b/;
 
+/**
+ * A substitution or a change to an amount, or null. A change is aimed at the amount ("less sugar", "cut the sugar in
+ * half", "cut back on the butter", "double the garlic") — "cut the butter into cubes", "lower the heat before the
+ * milk" and "any more sugar?" are not (the final review's probes).
+ */
 export function detectChange(utterance: string, recipe: CoachRecipe, pack: Pack = PACK): ChangeAsk | null {
-  const named = mentionedItem(utterance, recipe, pack);
-  if (!named) return null;
+  const mentions = mentionedItems(utterance, recipe, pack);
+  if (!mentions.length) return null;
+  const said = saidText(utterance);
   const lower = utterance.toLowerCase();
-  const ask = SUBSTITUTE.test(lower) ? "substitute" : LESS.test(lower) ? "less" : MORE.test(lower) ? "more" : null;
-  return ask ? { item: named.item, ask } : null;
+  if (SUBSTITUTE.test(lower)) {
+    // "honey instead of sugar": the recipe's ingredient is the one being replaced.
+    return { item: mentions[mentions.length - 1].item, ask: "substitute" };
+  }
+  for (const m of mentions) {
+    const p = m.phrase.replace(/[-&]/g, "\\$&");
+    const the = "(?:the |some |my |a bit of |a little )?(?:amount of )?";
+    if (new RegExp(`\\b(less|reduce|halve|skip|leave out|cut back on|cut down on|go easy on|lower) ${the}${p}\\b`).test(said)
+      || new RegExp(`\\bcut ${the}${p} (?:in half|by|back|down)\\b`).test(said)) return { item: m.item, ask: "less" };
+    if (new RegExp(`\\b(?:use|add|put(?: in)?) (?:a bit |a little |some )?(?:more|extra) ${p}\\b`).test(said)
+      || new RegExp(`\\b(?:double|triple) ${the}${p}\\b`).test(said)) return { item: m.item, ask: "more" };
+  }
+  return null;
+}
+
+/** What a swap replaces, by the pack's own wording: "for buttermilk: …" or "… in place of buttermilk[, in …]". */
+function replaces(use: string): string | null {
+  const m = /^for\s+([^:;]+)[:;]/i.exec(use) ?? /\bin place of\s+([^,;(]+?)(?=\s+in\s|\s*[,;(]|$)/i.exec(use);
+  return m ? normaliseItem(m[1]) : null;
 }
 
 export type ChangeAnswer = { grounded: boolean; facts: string; numbers: string[] };
@@ -38,18 +59,22 @@ export function answerChange(q: ChangeAsk, recipe: CoachRecipe, pack: Pack = PAC
     // The swap for this ingredient: one whose wording names it; or the role's only sourced swap. Never another
     // ingredient's swap that happens to share the role ("no sour cream?" is not answered with buttermilk's).
     const subs = roles.flatMap((r) => r.substitutions).filter((s) => !s.provisional);
-    const sub = subs.find((s) => normaliseItem(s.use.replace(/^for\s+/i, "").split(/[:;]/)[0]) === name || s.use.toLowerCase().includes(name))
-      ?? (subs.length === 1 ? subs[0] : undefined);
+    // Matched by the label naming what it replaces ("for buttermilk: …"); a swap with no label is offered only when it
+    // is its role's only one and the role is this ingredient's alone.
+    const sub = subs.find((x) => replaces(x.use) === name)
+      ?? (subs.length === 1 && !replaces(subs[0].use) && roles.length === 1 ? subs[0] : undefined);
     if (!sub) return none;
-    const what = sub.use.replace(/^for [^:;]+[:;]\s*/i, "");
-    if (!amount) return { grounded: true, facts: `Instead of ${name}: ${what}. ${sub.effect}`, numbers: [] };
+    const what = sub.use.replace(/^for [^:;]+[:;]\s*/i, "").replace(/\s+in place of\s+[^,;(]+?(?=\s+in\s|\s*[,;(]|$)/i, "");
+    // A swap that carries its own measure ("½ tsp per tsp of extract") is said as written: no amount on top of it.
+    if (!amount || /\bper\b|\d/.test(what)) return { grounded: true, facts: `Instead of ${name}: ${what}. ${sub.effect}`, numbers: [] };
     const use = speakAmount(scaleAmount(amount, sub.ratio));
     return { grounded: true, facts: `For the ${speakAmount(amount)} of ${name}, use ${use} of ${what}. ${sub.effect}`, numbers: [use] };
   }
   const change = roles.flatMap((r) => r.changes).find((c) => c.direction === q.ask && !c.provisional);
   if (!change) return none;
   const pct = `${Math.round(change.upTo * 100)}%`;
-  return { grounded: true, facts: `${q.ask === "less" ? "Cutting" : "Adding more"} ${name}: up to ${pct} is safe. ${change.effect}`, numbers: [pct] };
+  if (q.ask === "less" && change.upTo >= 1) return { grounded: true, facts: `You can leave the ${name} out. ${change.effect}`, numbers: [] };
+  return { grounded: true, facts: `${q.ask === "less" ? "Cutting" : "Adding more"} ${name}: up to ${pct} ${q.ask} is safe. ${change.effect}`, numbers: [pct] };
 }
 
 const PHRASE = [

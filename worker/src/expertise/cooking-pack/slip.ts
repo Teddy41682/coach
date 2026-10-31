@@ -3,7 +3,7 @@ import type { ModelConnector } from "../../model/connector";
 import type { CoachEvent } from "../../sse";
 import { parseAmount, ratio, scaleAmount, speakAmount, type Amount } from "../amount";
 import { PACK } from "./index";
-import { mentionedItem, normaliseItem } from "./lookup";
+import { mentionedItem, mentionedItems, normaliseItem, saidText, type Mention } from "./lookup";
 import type { Kind, Pack } from "./types";
 import { rule, type Ruling } from "./verdict";
 
@@ -36,10 +36,25 @@ function lastCoachLine(timeline: string[]): string {
 
 export type Slip = { item: string; said: Amount | null };
 
+/** A question about the recipe ("can I use honey instead?", "how much vanilla goes in?") is never a slip. */
+const QUESTION = /^(can|could|should|shall|do|does|did|is|are|was|will|would|what|how|when|which|why|any)\b|\?\s*$|\bhow (much|many)\b/;
+const TOO_LITTLE = /\b(only|not enough|too little|short on|half the|half of the|less than)\b/;
+
+/** The amount said beside a mention: in the words since the previous mention, else in the few words after it. */
+function amountBeside(said: string, mentions: Mention[], k: number): Amount | null {
+  const m = mentions[k];
+  const from = k > 0 ? mentions[k - 1].at + mentions[k - 1].phrase.length : 0;
+  const before = parseAmount(said.slice(from, m.at).split(" ").slice(-6).join(" "));
+  if (before) return before;
+  const to = k + 1 < mentions.length ? mentions[k + 1].at : said.length;
+  return parseAmount(said.slice(m.at + m.phrase.length, to).split(" ").slice(0, 6).join(" "));
+}
+
 /**
- * A slip in the cook's words, or null: the answer to the coach's own "how much … went in?"; or a recipe ingredient
- * named with a slip word ("too much", "forgot", "instead"…) or with an amount off the recipe's by more than a fifth.
- * Naming an ingredient alone ("is the vanilla in this step?") is not a slip.
+ * A slip in the cook's words, or null: the answer to the coach's own "how much … went in?"; or, in a statement (never
+ * a question), a recipe ingredient whose amount beside it is off the recipe's by more than a fifth, one said to be
+ * forgotten, one there's too little of, or one named with a slip word ("too much", "instead", "by mistake"…). Naming
+ * an ingredient alone, or two right amounts, is not a slip.
  */
 export function detectSlip(utterance: string, timeline: string[], recipe: CoachRecipe, pack: Pack = PACK): Slip | null {
   const asked = ASKED.exec(lastCoachLine(timeline));
@@ -47,14 +62,27 @@ export function detectSlip(utterance: string, timeline: string[], recipe: CoachR
     const item = mentionedItem(asked[1], recipe, pack)?.item;
     if (item) return { item, said: parseAmount(utterance) };
   }
-  const named = mentionedItem(utterance, recipe, pack);
-  if (!named) return null;
-  const lower = utterance.toLowerCase();
-  if (FORGOT.test(lower)) return { item: named.item, said: { value: 0, unit: named.recipeAmount?.unit ?? "each" } };
-  const said = parseAmount(utterance);
-  const off = said && named.recipeAmount ? Math.abs((ratio(said, named.recipeAmount) ?? 1) - 1) > 0.2 : false;
-  if (!SLIP_WORDS.test(lower) && !off) return null;
-  return { item: named.item, said };
+  const lower = utterance.toLowerCase().trim();
+  if (QUESTION.test(lower)) return null;
+  const said = saidText(utterance);
+  const mentions = mentionedItems(utterance, recipe, pack);
+  if (!mentions.length) return null;
+  const amounts = mentions.map((_, k) => amountBeside(said, mentions, k));
+  if (FORGOT.test(lower) && !/\bhow (much|many)\b/.test(lower)) {
+    const after = said.search(FORGOT);
+    const m = mentions.find((x) => x.at > after) ?? mentions[0];
+    return { item: m.item, said: { value: 0, unit: m.recipeAmount?.unit ?? "each" } };
+  }
+  for (const [k, m] of mentions.entries()) {
+    const a = amounts[k];
+    const r = a && m.recipeAmount ? ratio(a, m.recipeAmount) : null;
+    if (r !== null && Math.abs(r - 1) > 0.2) return { item: m.item, said: a };
+  }
+  const longest = mentions.reduce((b, m) => (m.phrase.length > b.phrase.length ? m : b));
+  const k = mentions.indexOf(longest);
+  if (TOO_LITTLE.test(lower)) return { item: longest.item, said: amounts[k] };
+  if (SLIP_WORDS.test(lower)) return { item: longest.item, said: amounts[k] };
+  return null;
 }
 
 const list = (r: Ruling) => (r.rescue?.adds ?? []).map((a) => `${speakAmount(a.amount)} ${a.item}`).join(", ");

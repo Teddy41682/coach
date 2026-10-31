@@ -34,6 +34,10 @@ export type Rescue = {
 };
 
 export type Substitution = { use: string; ratio: number; effect: string; sources: string[]; provisional?: boolean };
+/**
+ * How far an amount may be changed and what that does. `upTo` is the fraction of the recipe amount it may change by:
+ * 0.25 = up to a quarter less (or more); 1 with "less" = it can be left out. Never a ratio of the recipe amount.
+ */
 export type Change = { direction: "less" | "more"; upTo: number; effect: string; sources: string[]; provisional?: boolean };
 
 export type Role = {

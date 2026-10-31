@@ -3,6 +3,7 @@
  * Encoded from docs/research/expertise/c-leaveners-flours-thickeners.md. Ratio = actual ÷ recipe amount.
  *
  * NOT ENCODED (needs code):
+ * (upTo below is the fraction of the recipe amount, converted 2026-10-31 from the ratio this file first used.)
  *  1. Doubt → redo. Where a band is provisional the engine should prefer the more conservative neighbouring verdict.
  *     `Band` has no provisional flag, so provisional bands are marked by comment only: soda 1.25/2.0; powder 1.3 and
  *     the pastry restriction; yeast 1.5/2.0; wheat-flour 0.6 floor; every gf-flour-binder band; starch-thickener
@@ -195,8 +196,8 @@ export const ROLES: Role[] = [
       { use: "potassium bicarbonate", ratio: 1, effect: "Salt-free, slightly less browning.", sources: [McGee10], provisional: true },
     ],
     changes: [
-      { direction: "less", upTo: 0.75, effect: "Slightly paler, less spread; fine in acid-light recipes.", sources: [Corriher, ATK_SGC] },
-      { direction: "more", upTo: 1.25, effect: "More browning, flatter, more spread in cookies; beyond this it tastes soapy.", sources: [Corriher, SE_Stella] },
+      { direction: "less", upTo: 0.25, effect: "Slightly paler, less spread; fine in acid-light recipes.", sources: [Corriher, ATK_SGC] },
+      { direction: "more", upTo: 0.25, effect: "More browning, flatter, more spread in cookies; beyond this it tastes soapy.", sources: [Corriher, SE_Stella] },
     ],
     shows: "Batter foaming soon after mixing is normal. Too much: unusually dark, reddish-brown crust, speckled crumb, very flat spread cookies — but the soapy taste is invisible, so rely on what the cook reports. Too little: pale, flat, tight crumb with no dome.",
     sources: [Corriher, McGee10, ATK_SGC, KA_Soda],
@@ -234,8 +235,8 @@ export const ROLES: Role[] = [
       // Not acceptable: baking soda alone with no acid (soapy, little rise) → redo.
     ],
     changes: [
-      { direction: "less", upTo: 0.75, effect: "Slightly denser.", sources: [Corriher, KA_Soda] },
-      { direction: "more", upTo: 1.25, effect: "More dome, slightly coarser; above this it risks collapse.", sources: [Corriher, BeranbaumCB] },
+      { direction: "less", upTo: 0.25, effect: "Slightly denser.", sources: [Corriher, KA_Soda] },
+      { direction: "more", upTo: 0.25, effect: "More dome, slightly coarser; above this it risks collapse.", sources: [Corriher, BeranbaumCB] },
     ],
     shows: "Batter looks normal either way. Too much: very fast rise with big surface bubbles, then a sunken, cratered or cracked centre after cooling; pancakes puff then deflate. Too little: flat top, no dome, dense crumb; thin flat pancakes.",
     sources: [Corriher, BeranbaumCB, McGee10, KA_Soda],
@@ -267,7 +268,7 @@ export const ROLES: Role[] = [
     ],
     changes: [
       { direction: "less", upTo: 0.5, effect: "Longer rise, more flavour.", sources: [KA_Yeast, Hamelman] },
-      { direction: "more", upTo: 1.5, effect: "Faster rise; safe if proofed by sight.", sources: [Hamelman, Reinhart] },
+      { direction: "more", upTo: 0.5, effect: "Faster rise; safe if proofed by sight.", sources: [Hamelman, Reinhart] },
     ],
     shows: "Too much: dough rising very fast, large irregular bubbles, sagging or collapsing when touched, strong beery smell. None or dead yeast: no visible rise after the expected time — ask how hot the liquid was.",
     sources: [Hamelman, Reinhart, KA_Yeast, McGee10],
@@ -318,8 +319,8 @@ export const ROLES: Role[] = [
       { use: "gluten-free 1:1 blend", ratio: 1, effect: "Acceptable in cookies, muffins, quick breads and cakes (some dryness); not in yeast bread or laminated pastry — redo there.", sources: [KA_GF, ATK_GF] },
     ],
     changes: [
-      { direction: "less", upTo: 0.9, effect: "Within normal measuring error.", sources: [ATK_Flour, KA_Flour] },
-      { direction: "more", upTo: 1.1, effect: "Within normal measuring error; 20–25% more gives dry, tough, domed cakes and cookies that don't spread.", sources: [ATK_Flour, KA_Flour, Corriher] },
+      { direction: "less", upTo: 0.1, effect: "Within normal measuring error.", sources: [ATK_Flour, KA_Flour] },
+      { direction: "more", upTo: 0.1, effect: "Within normal measuring error; 20–25% more gives dry, tough, domed cakes and cookies that don't spread.", sources: [ATK_Flour, KA_Flour, Corriher] },
     ],
     shows: "Too much: batter stiff, holds peaks and won't level; bread dough stiff and tearing. Too little: batter thin and runny where it should be thick, cookie dough glossy and slack, bread dough a sticky puddle.",
     sources: [ATK_Flour, KA_Flour, Corriher, Hamelman],
@@ -372,9 +373,9 @@ export const ROLES: Role[] = [
     ],
     changes: [
       { direction: "less", upTo: 0.5, effect: "Xanthan: texture shifts only.", sources: [KA_Xanthan, ATK_GF], provisional: true },
-      { direction: "more", upTo: 1.5, effect: "Xanthan: texture shifts only; beyond this gummy and slimy.", sources: [KA_Xanthan, ATK_GF], provisional: true },
-      { direction: "less", upTo: 0.75, effect: "Psyllium: slacker dough.", sources: [ATK_GF, Goyoaga], provisional: true },
-      { direction: "more", upTo: 1.25, effect: "Psyllium: firmer dough.", sources: [ATK_GF, Goyoaga], provisional: true },
+      { direction: "more", upTo: 0.5, effect: "Xanthan: texture shifts only; beyond this gummy and slimy.", sources: [KA_Xanthan, ATK_GF], provisional: true },
+      { direction: "less", upTo: 0.25, effect: "Psyllium: slacker dough.", sources: [ATK_GF, Goyoaga], provisional: true },
+      { direction: "more", upTo: 0.25, effect: "Psyllium: firmer dough.", sources: [ATK_GF, Goyoaga], provisional: true },
     ],
     shows: "GF batters look thicker and pastier than wheat ones. Stringy, gelled lumps mean xanthan went straight into liquid. Pão de queijo dough runny like pancake batter means too little tapioca; crumbly and cracking when rolled means too much. A slack boule spreading on the board means too little psyllium or too much water.",
     sources: [KA_Xanthan, KA_GF, ATK_GF, Goyoaga, KA_PDQ, Schwartz],
@@ -419,8 +420,8 @@ export const ROLES: Role[] = [
       { use: "tapioca starch (for cornstarch)", ratio: 1, effect: "Sources disagree on its strength; use 1:1 and add a slurry if it's thin — thin is easier to fix than gluey.", sources: [KA_Pie, McGee11] },
     ],
     changes: [
-      { direction: "less", upTo: 0.75, effect: "Looser sauce (pie filling: fine to −25%).", sources: [CIA, KA_Pie] },
-      { direction: "more", upTo: 1.35, effect: "Tighter, glossier sauce (pie filling: fine only to +25%).", sources: [CIA, KA_Pie] },
+      { direction: "less", upTo: 0.25, effect: "Looser sauce (pie filling: fine to −25%).", sources: [CIA, KA_Pie] },
+      { direction: "more", upTo: 0.35, effect: "Tighter, glossier sauce (pie filling: fine only to +25%).", sources: [CIA, KA_Pie] },
     ],
     shows: "Nappe test: sauce coats the back of a spoon or runs straight off. Gloopy, gel-like mass or visible lumps; cloudy versus clear glaze. Pie filling soupy when cut after baking — no rescue then.",
     sources: [CIA, Joy, McGee11, KA_Pie, FoodLab],
@@ -442,7 +443,7 @@ export const ROLES: Role[] = [
     ],
     changes: [
       { direction: "less", upTo: 0.5, effect: "Only coverage changes.", sources: [CIA, FoodLab] },
-      { direction: "more", upTo: Infinity, effect: "Fine — the excess is discarded.", sources: [CIA, FoodLab] },
+      { direction: "more", upTo: 1.0, effect: "Fine — the excess is discarded.", sources: [CIA, FoodLab] },
     ],
     shows: "Bald patches or coating sliding off in sheets (skipped flour, crowded pan, moved too early); crumbs burning before the inside cooks (cornflakes or sugary coatings in very hot oil). A pale, soggy crust is oil too cool — the frying pack's call.",
     sources: [CIA, FoodLab, ATK_SGC],

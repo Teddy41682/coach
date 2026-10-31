@@ -23,10 +23,19 @@ describe("substitutions and changes, from the pack", () => {
     expect(detectChange("can I cut the sugar in half?", PANCAKES, WITH_SUBS)).toEqual({ item: "sugar", ask: "less" });
     expect(detectChange("how's it looking?", PANCAKES, WITH_SUBS)).toBeNull();
   });
+  it("a change is about the amount — cutting butter into cubes and lowering the heat are not (the final review's probes)", () => {
+    const r = { title: "Cake", ingredients: [{ amount: "1 cup", item: "butter" }, { amount: "1 cup", item: "milk" }, { amount: "1 cup", item: "sugar" }], steps: ["Mix."] };
+    expect(detectChange("should I cut the butter into cubes?", r, WITH_SUBS)).toBeNull();
+    expect(detectChange("lower the heat before the milk?", r, WITH_SUBS)).toBeNull();
+    expect(detectChange("any more sugar?", r, WITH_SUBS)).toBeNull();
+    expect(detectChange("can I use less sugar?", r, WITH_SUBS)).toEqual({ item: "sugar", ask: "less" });
+    expect(detectChange("can I cut the sugar in half?", r, WITH_SUBS)).toEqual({ item: "sugar", ask: "less" });
+    expect(detectChange("can I use honey instead of sugar?", r, WITH_SUBS)).toEqual({ item: "sugar", ask: "substitute" });
+  });
   it("a sourced substitution, with the amount computed", () => {
     const a = answerChange({ item: "buttermilk", ask: "substitute" }, PANCAKES, WITH_SUBS);
     expect(a.grounded).toBe(true);
-    expect(a.facts).toContain("1 cup of milk with 1 tbsp lemon juice per cup");
+    expect(a.facts).toContain("milk with 1 tbsp lemon juice per cup"); // its own measure, said as written
   });
   it("a sourced change, with how far it's safe", () => {
     const a = answerChange({ item: "sugar", ask: "less" }, PANCAKES, WITH_SUBS);
@@ -43,6 +52,24 @@ describe("substitutions and changes, from the pack", () => {
     const odd = { title: "Dip", ingredients: [{ amount: "1 cup", item: "crème fraîche" }], steps: ["Stir."] };
     const three: Pack = { ...two, index: { ...two.index, "creme fraiche": ["dairy-cultured"] } };
     expect(answerChange({ item: "crème fraîche", ask: "substitute" }, odd, three).grounded).toBe(false);
+  });
+  it("a swap is matched by what it replaces, never by a word in its own text (the final review: milk got cream's swap)", () => {
+    const p: Pack = { ...WITH_SUBS, roles: WITH_SUBS.roles.map((r) => r.id === "dairy-cultured" ? { ...r, substitutions: [
+      { use: "for cream: whole milk in place of cream, in a sauce", ratio: 1, effect: "Thinner.", sources: S }] } : r),
+      index: { ...WITH_SUBS.index, "whole milk": ["dairy-cultured"] } };
+    const r = { title: "Sauce", ingredients: [{ amount: "½ cup", item: "whole milk" }], steps: ["Stir."] };
+    expect(answerChange({ item: "whole milk", ask: "substitute" }, r, p).grounded).toBe(false);
+  });
+  it("reads the pack's own wording: 'X in place of Y' answers for Y; a swap with its own measure is said as written", () => {
+    const p: Pack = { ...WITH_SUBS, roles: WITH_SUBS.roles.map((r) => r.id === "liquid" ? { ...r, substitutions: [
+      { use: "stock in place of water", ratio: 1, effect: "More savoury.", sources: S },
+      { use: "milk in place of water in pancake batter", ratio: 1, effect: "Richer.", sources: S }] }
+      : r.id === "flavour-extract" ? { ...r, substitutions: [{ use: "vanilla paste, ½ tsp per tsp of extract", ratio: 1, effect: "Flecked.", sources: S }] } : r) };
+    const soup = { title: "Soup", ingredients: [{ amount: "4 cups", item: "water" }, { amount: "1 tsp", item: "vanilla extract" }], steps: ["Simmer."] };
+    const w = answerChange({ item: "water", ask: "substitute" }, soup, p);
+    expect(w.facts).toContain("4 cups of stock");
+    const v = answerChange({ item: "vanilla extract", ask: "substitute" }, soup, p);
+    expect(v.facts).toBe("Instead of vanilla extract: vanilla paste, ½ tsp per tsp of extract. Flecked.");
   });
   it("nothing sourced: not grounded, so the mind answers as judgement", () => {
     expect(answerChange({ item: "pure vanilla extract", ask: "substitute" }, CUPCAKES, WITH_SUBS).grounded).toBe(false);

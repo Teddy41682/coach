@@ -24,6 +24,7 @@ import type { Band, Role } from "../types";
  *   need it add role "starch-thickener" (another group).
  *
  * NOT ENCODED (needs code):
+ * (upTo below is the fraction of the recipe amount, converted 2026-10-31 from the ratio this file first used.)
  * 1. Temperature deltas vs ratios (research open question 1). A °F ratio is unit-dependent; the research recommends
  *    encoding ±°F/°C deltas for oven and oil. heat-oven and heat-frying are encoded as °F ratios only; the deltas
  *    (fine ≈ ±15–20 °F oven at 350 °F; oil 325–375 °F fine, >400 °F stop) need a delta band in code.
@@ -285,10 +286,10 @@ export const ROLES: Role[] = [
       { use: "milk in place of water in pancake batter", ratio: 1, effect: "Richer; browns faster.", sources: [SFAT_SALT, CI_BRAISE, M11] },
     ],
     changes: [
-      { direction: "less", upTo: 0.8, effect: "Sauce, braise or soup: thicker and saltier; below this it needs add-back-liquid.", sources: [M11, SFAT_HEAT, SGC, FL_BRAISE, CI_BRAISE] },
-      { direction: "more", upTo: 1.25, effect: "Sauce, braise or soup: thinner; season at the end.", sources: [M11, SFAT_HEAT, SGC, FL_BRAISE, CI_BRAISE] },
-      { direction: "less", upTo: 0.95, effect: "Grains, baking, pastry: only ±5 %; beyond that the texture changes.", sources: [M9, CI_RICE, M10, KA_BP] },
-      { direction: "more", upTo: 1.05, effect: "Grains, baking, pastry: only ±5 %; beyond that the texture changes.", sources: [M9, CI_RICE, M10, KA_BP] },
+      { direction: "less", upTo: 0.2, effect: "Sauce, braise or soup: thicker and saltier; below this it needs add-back-liquid.", sources: [M11, SFAT_HEAT, SGC, FL_BRAISE, CI_BRAISE] },
+      { direction: "more", upTo: 0.25, effect: "Sauce, braise or soup: thinner; season at the end.", sources: [M11, SFAT_HEAT, SGC, FL_BRAISE, CI_BRAISE] },
+      { direction: "less", upTo: 0.05, effect: "Grains, baking, pastry: only ±5 %; beyond that the texture changes.", sources: [M9, CI_RICE, M10, KA_BP] },
+      { direction: "more", upTo: 0.05, effect: "Grains, baking, pastry: only ±5 %; beyond that the texture changes.", sources: [M9, CI_RICE, M10, KA_BP] },
     ],
     shows: "Too much: a soupy sauce that won't coat a spoon; braising liquid covering the meat; rice sitting in standing water with swollen, burst grains; slack dough spreading flat and sticking to hands; runny batter. Too little: the pan going dry, sizzling instead of simmering, browning or sticking at the base, smoke; rice with hard white cores and a crackling sound; shaggy dough that won't come together.",
     sources: [M11, M9, M10, M3, SFAT_SALT, SFAT_HEAT, SGC, ATK_CS, FL_BRAISE, CI_BRAISE, CI_RICE, SE_RICE, KA_BP, MC],
@@ -406,8 +407,8 @@ export const ROLES: Role[] = [
       { use: "evaporated milk in place of coconut milk", ratio: 1, effect: "A dairy stand-in.", sources: [CI_SUBS], provisional: true },
     ],
     changes: [
-      { direction: "less", upTo: 0.8, effect: "More intense, less creamy.", sources: [M11, SE_COCONUT] },
-      { direction: "more", upTo: 1.4, effect: "Milder, sweeter, thinner.", sources: [M11, SE_COCONUT] },
+      { direction: "less", upTo: 0.2, effect: "More intense, less creamy.", sources: [M11, SE_COCONUT] },
+      { direction: "more", upTo: 0.4, effect: "Milder, sweeter, thinner.", sources: [M11, SE_COCONUT] },
     ],
     shows: "Too much: a pale, thin, milky curry with the spice dulled. Too little: the paste frying and catching, thick and oily. Split: oil pooling on top, grainy flecks.",
     sources: [M11, M9, SE_COCONUT, SGC, CI_SUBS],
@@ -463,8 +464,8 @@ export const ROLES: Role[] = [
       // Shallot or more onion for a milder base: the research gives no ratio, so not encoded.
     ],
     changes: [
-      { direction: "less", upTo: 0, effect: "Always safe in a cooked dish — just milder.", sources: [M6], provisional: true },
-      { direction: "more", upTo: 1.75, effect: "In a cooked dish, a matter of taste up to here.", sources: [M6], provisional: true },
+      { direction: "less", upTo: 1.0, effect: "Always safe in a cooked dish — just milder.", sources: [M6], provisional: true },
+      { direction: "more", upTo: 0.75, effect: "In a cooked dish, a matter of taste up to here.", sources: [M6], provisional: true },
     ],
     shows: "Burnt: black or dark-brown specks, acrid blue smoke, the pan smoking. Too much raw: visible heaps of mince. Golden-edged pale pieces are fine.",
     sources: [SFAT_HEAT, FOODLAB, SGC, M6, CI_SUBS],
@@ -529,7 +530,7 @@ export const ROLES: Role[] = [
     ],
     changes: [
       { direction: "less", upTo: 0.5, effect: "A lighter, less sweet base.", sources: [M6, SFAT_HEAT], provisional: true },
-      { direction: "more", upTo: 2.0, effect: "Sweeter and softer; a longer sweat.", sources: [M6, SFAT_HEAT], provisional: true },
+      { direction: "more", upTo: 1.0, effect: "Sweeter and softer; a longer sweat.", sources: [M6, SFAT_HEAT], provisional: true },
     ],
     shows: "Too hot: edges black before the centre softens. Too cold: pale and steaming, not sizzling. Burnt: black pieces, bitter smoke.",
     sources: [M6, SFAT_HEAT, SE_ONION],
@@ -573,8 +574,8 @@ export const ROLES: Role[] = [
       { use: "ground ginger, ¼ tsp per 1 tbsp fresh grated", ratio: 0.25, effect: "Different — earthier, less bright. Galangal is not a 1:1 swap (piney, sharper).", sources: [M8], provisional: true },
     ],
     changes: [
-      { direction: "less", upTo: 0, effect: "Milder.", sources: [M8], provisional: true },
-      { direction: "more", upTo: 1.5, effect: "Hotter and sharper.", sources: [M8], provisional: true },
+      { direction: "less", upTo: 1.0, effect: "Milder.", sources: [M8], provisional: true },
+      { direction: "more", upTo: 0.5, effect: "Hotter and sharper.", sources: [M8], provisional: true },
     ],
     shows: "Fibrous strands; burnt dark bits; the cook says it's too spicy or hot.",
     sources: [M8],
@@ -812,8 +813,8 @@ export const ROLES: Role[] = [
       { use: "another neutral high-smoke-point oil (canola, peanut, vegetable, rice bran, sunflower)", ratio: 1, effect: "Interchangeable. Extra-virgin olive oil and butter are poor deep-frying choices (lower smoke points). Shallow-fry depth is about half the food's thickness.", sources: [FSIS_F, M14] },
     ],
     changes: [
-      { direction: "less", upTo: 0.93, effect: "A little cooler (about 325 °F) for thick bone-in pieces that need time to cook through.", sources: [M14, SFAT_FAT, SGC, FL_BATTERS], provisional: true },
-      { direction: "more", upTo: 1.07, effect: "Hotter (about 375 °F) for thin, quick items.", sources: [M14, SFAT_FAT, SGC, FL_BATTERS], provisional: true },
+      { direction: "less", upTo: 0.07, effect: "A little cooler (about 325 °F) for thick bone-in pieces that need time to cook through.", sources: [M14, SFAT_FAT, SGC, FL_BATTERS], provisional: true },
+      { direction: "more", upTo: 0.07, effect: "Hotter (about 375 °F) for thin, quick items.", sources: [M14, SFAT_FAT, SGC, FL_BATTERS], provisional: true },
     ],
     shows: "Too cold: pale, greasy, sodden; few bubbles; food sinks and sits. Too hot: wisps of smoke, darkening in seconds, an acrid smell. Overcrowded: the temperature crashes, pieces stick together and steam. Breading falling off: bare patches, crumbs floating. Spent oil: dark, foamy, smells off. Air fryer: pale, steamed, soggy pieces; uneven browning; loose dry crumbs in the basket.",
     sources: [M14, SFAT_FAT, SGC, FL_BATTERS, FSIS_F, MSU, FSIS_T, CI_FRYING],

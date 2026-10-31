@@ -44,9 +44,27 @@ export function rolesFor(item: string, pack: Pack = PACK): Role[] {
 export function mentionedItem(
   utterance: string, recipe: CoachRecipe, pack: Pack = PACK,
 ): { item: string; recipeAmount: Amount | null } | null {
-  const said = ` ${utterance.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z&\s-]/g, " ").replace(/\s+/g, " ")} `;
-  let best: { item: string; recipeAmount: Amount | null; length: number } | null = null;
+  const all = mentionedItems(utterance, recipe, pack);
+  const best = all.reduce<Mention | null>((b, m) => (!b || m.phrase.length > b.phrase.length ? m : b), null);
+  return best && { item: best.item, recipeAmount: best.recipeAmount };
+}
+
+/** One recipe ingredient named in the cook's words: what was said for it, and where (in `said`, below). */
+export type Mention = { item: string; recipeAmount: Amount | null; phrase: string; at: number };
+
+/** The cook's words as names are matched against them: plain lower-case letters, single spaces. */
+export const saidText = (utterance: string) =>
+  utterance.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9¼½¾⅓⅔⅛⅜⅝⅞/.&\s-]/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * Every recipe ingredient the words name, each with the longest phrase that named it and where it starts — so a
+ * sentence naming two ("2 cups of sugar and the vanilla") is read ingredient by ingredient. Plurals count ("eggs").
+ */
+export function mentionedItems(utterance: string, recipe: CoachRecipe, pack: Pack = PACK): Mention[] {
+  const said = saidText(utterance);
+  const out: Mention[] = [];
   for (const ing of recipe.ingredients) {
+    let best: Mention | null = null;
     const name = normaliseItem(ing.item);
     const canonical = pack.aliases[name] ?? name;
     const words = new Set(name.split(" "));
@@ -56,9 +74,16 @@ export function mentionedItem(
       ...Object.keys(pack.index).filter((k) => k !== name && k.split(" ").every((w) => words.has(w))),
     ]);
     for (const n of names) {
-      if (!n || !has(said.trim(), n) && !has(said.trim(), n.replace(/s$/, ""))) continue;
-      if (!best || n.length > best.length) best = { item: ing.item.split(",")[0].trim(), recipeAmount: parseAmount(ing.amount), length: n.length };
+      for (const form of n ? [n, `${n}s`, `${n}es`] : []) {
+        const m = new RegExp(`(^|\\s)${form.replace(/[-&]/g, "\\$&")}(?=\\s|$)`).exec(said);
+        if (m && (!best || form.length > best.phrase.length)) {
+          best = { item: ing.item.split(",")[0].trim(), recipeAmount: parseAmount(ing.amount), phrase: form, at: m.index + m[1].length };
+        }
+      }
     }
+    if (best) out.push(best);
   }
-  return best && { item: best.item, recipeAmount: best.recipeAmount };
+  // One ingredient per stretch of words: "baking powder" is never also "baking soda"'s "baking".
+  return out.filter((m) => !out.some((o) => o !== m && o.at <= m.at && o.at + o.phrase.length >= m.at + m.phrase.length && o.phrase.length > m.phrase.length))
+    .sort((a, b) => a.at - b.at);
 }

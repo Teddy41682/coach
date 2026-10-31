@@ -29,6 +29,22 @@ describe("spotting a slip in the cook's words", () => {
   });
 });
 
+describe("not mistaking questions and plain statements for slips (the final review's probes)", () => {
+  it("a question is not a slip, even with a slip word in it", () => {
+    expect(detectSlip("can I use honey instead of sugar?", [], CUPCAKES, FIXTURE)).toBeNull();
+    expect(detectSlip("should I add extra vanilla?", [], CUPCAKES, FIXTURE)).toBeNull();
+    expect(detectSlip("I forgot how much vanilla goes in", [], CUPCAKES, FIXTURE)).toBeNull();
+  });
+  it("the amount is the one beside the ingredient, so two right amounts aren't a slip", () => {
+    expect(detectSlip("I added 1 tsp vanilla and ½ cup butter", [], CUPCAKES, FIXTURE)).toBeNull();
+    expect(detectSlip("I put 2 cups of sugar and the vanilla in", [], CUPCAKES, FIXTURE)).toEqual({ item: "sugar", said: { value: 2, unit: "cup" } });
+  });
+  it("plurals count, and so does too little", () => {
+    expect(detectSlip("I used 3 eggs", [], CUPCAKES, FIXTURE)).toEqual({ item: "large eggs", said: { value: 3, unit: "each" } });
+    expect(detectSlip("I only put half the sugar in", [], CUPCAKES, FIXTURE)).toEqual({ item: "sugar", said: null });
+  });
+});
+
 describe("handling it", () => {
   const ctx = (said: string[], model: ModelConnector, timeline: string[] = []) =>
     collect(slipEvents(detectSlip(said.at(-1)!, timeline, CUPCAKES, FIXTURE)!, { recipe: CUPCAKES, kind: "baking", timeline, model, pack: FIXTURE }));

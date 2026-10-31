@@ -29,6 +29,15 @@ describe("the pack's checker", () => {
   });
 });
 
+describe("what a change's upTo means", () => {
+  it("is the fraction of the recipe amount you may change by — never a ratio, never unbounded", () => {
+    const bad = (upTo: number) => validatePack(pack(role({ changes: [{ direction: "less", upTo, effect: "x", sources: S }] })));
+    expect(bad(0.15)).toEqual([]);
+    expect(bad(0)).toEqual(["role flavour-extract change 0 (less): upTo 0 is not a fraction of the recipe amount (0 < upTo ≤ 2)"]);
+    expect(bad(Infinity)).toEqual(["role flavour-extract change 0 (less): upTo Infinity is not a fraction of the recipe amount (0 < upTo ≤ 2)"]);
+  });
+});
+
 describe("the shipped pack", () => {
   it("is sound", () => {
     expect(validatePack(PACK)).toEqual([]);

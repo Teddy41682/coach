@@ -15,6 +15,22 @@ describe("amounts in code", () => {
     expect(parseAmount("2")).toEqual({ value: 2, unit: "each" });
     expect(parseAmount("a pinch")).toEqual({ value: 1, unit: "pinch" });
   });
+  it("reads spoken fractions whole, and a capital T is a tablespoon (the final review's probes)", () => {
+    expect(parseAmount("1 T sugar")).toEqual({ value: 1, unit: "tbsp" });
+    expect(parseAmount("1 t salt")).toEqual({ value: 1, unit: "tsp" });
+    expect(parseAmount("half a cup")).toEqual({ value: 0.5, unit: "cup" });
+    expect(parseAmount("half a teaspoon")).toEqual({ value: 0.5, unit: "tsp" });
+    expect(parseAmount("one and a half cups")).toEqual({ value: 1.5, unit: "cup" });
+    expect(parseAmount("one and a half tablespoons")).toEqual({ value: 1.5, unit: "tbsp" });
+    expect(parseAmount("a cup and a half")).toEqual({ value: 1.5, unit: "cup" });
+    expect(parseAmount("a teaspoon and a half")).toEqual({ value: 1.5, unit: "tsp" });
+    expect(parseAmount("two and a quarter cups")).toEqual({ value: 2.25, unit: "cup" });
+    expect(parseAmount("1⅜ cups")).toEqual({ value: 1.375, unit: "cup" });
+    expect(parseAmount(".5 cup")).toEqual({ value: 0.5, unit: "cup" });
+    // A lone t is a teaspoon only after a number — not the t of "don't" or "can't".
+    expect(parseAmount("I don't have 2 cups")).toEqual({ value: 2, unit: "cup" });
+    expect(parseAmount("can't find it")).toBeNull();
+  });
   it("gives null for what isn't a number, and never throws", () => {
     expect(parseAmount("to taste")).toBeNull();
     expect(parseAmount("a splash")).toBeNull();
@@ -38,5 +54,9 @@ describe("amounts in code", () => {
     expect(speakAmount({ value: 1, unit: "each" })).toBe("1");
     expect(speakAmount({ value: 357.5, unit: "g" })).toBe("360 g");
     expect(speakAmount(scaleAmount({ value: 1, unit: "cup" }, 0.5))).toBe("½ cup");
+    // Small amounts keep their size: no "0 g", no 4 g said as 5 g; a spoon under ⅛ is a pinch.
+    expect(speakAmount({ value: 4, unit: "g" })).toBe("4 g");
+    expect(speakAmount({ value: 1.75, unit: "g" })).toBe("2 g");
+    expect(speakAmount({ value: 0.05, unit: "tsp" })).toBe("a pinch");
   });
 });
